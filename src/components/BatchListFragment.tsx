@@ -14,7 +14,9 @@ import {
   Trash2, 
   Copy,
   Check,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  Truck
 } from 'lucide-react';
 import { cn, formatWeight, formatDate, copyToClipboard } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -85,6 +87,14 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
                 <span>初始: {formatWeight(batch.bowei)}t</span>
                 <span className="text-slate-300">|</span>
                 <span className="font-bold text-slate-700">剩余: {formatWeight(batch.bcwei)}t</span>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <Calendar size={10} /> {formatDate(batch.bdate)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Truck size={10} /> {batch.bcli}
+                </span>
               </div>
             </div>
             <button 

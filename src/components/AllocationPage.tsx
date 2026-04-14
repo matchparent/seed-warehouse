@@ -6,7 +6,7 @@
 import { useState, useMemo } from 'react';
 import { db } from '../db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, CheckCircle2, Package, Info, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Package, Info, AlertCircle, Calendar, Truck } from 'lucide-react';
 import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatWeight } from '../lib/utils';
@@ -135,6 +135,10 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
                     <div>
                       <div className="text-sm font-bold text-slate-800">{batch.bname}</div>
                       <div className="text-[10px] text-emerald-600 font-medium">{variety?.vname}</div>
+                      <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-2">
+                        <span className="flex items-center gap-1"><Calendar size={10} /> {batch.bdate}</span>
+                        <span className="flex items-center gap-1"><Truck size={10} /> {batch.bcli}</span>
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-[10px] text-slate-400">剩余: {formatWeight(batch.bcwei)}t</div>
