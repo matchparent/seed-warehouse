@@ -1,0 +1,6 @@
+{
+  "name": "棉种仓储发货管理系统",
+  "description": "一个专为棉花种子仓库设计的离线仓储发货管理工具，支持批次管理、发货记录、数据统计及导出功能。",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
