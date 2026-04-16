@@ -16,7 +16,8 @@ import {
   Check,
   AlertCircle,
   Calendar,
-  Truck
+  Truck,
+  FileText
 } from 'lucide-react';
 import { cn, formatWeight, formatDate, copyToClipboard } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,8 +27,7 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
   const varieties = useLiveQuery(() => db.tab_variaty.toArray());
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [historyModal, setHistoryModal] = useState<number | null>(null);
-  const [editWeightModal, setEditWeightModal] = useState<number | null>(null);
-  const [editStatusModal, setEditStatusModal] = useState<number | null>(null);
+  const [modifyModal, setModifyModal] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -96,6 +96,12 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
                   <Truck size={10} /> {batch.bcli}
                 </span>
               </div>
+              {batch.bmemo && (
+                <div className="mt-1 flex items-start gap-1">
+                  <FileText size={10} className="text-slate-300 mt-0.5" />
+                  <p className="text-[10px] text-slate-400 line-clamp-1">{batch.bmemo}</p>
+                </div>
+              )}
             </div>
             <button 
               onClick={() => setMenuOpen(menuOpen === batch.bid ? null : batch.bid)}
@@ -116,8 +122,7 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
                     className="absolute right-3 top-10 bg-white shadow-xl border border-slate-100 rounded-xl py-1 z-20 min-w-[120px]"
                   >
                     <MenuButton icon={<History size={14} />} label="发货历史" onClick={() => { setHistoryModal(batch.bid); setMenuOpen(null); }} />
-                    <MenuButton icon={<Edit2 size={14} />} label="修改状态" onClick={() => { setEditStatusModal(batch.bid); setMenuOpen(null); }} />
-                    <MenuButton icon={<Edit2 size={14} />} label="修改剩余" onClick={() => { setEditWeightModal(batch.bid); setMenuOpen(null); }} />
+                    <MenuButton icon={<Edit2 size={14} />} label="修改" onClick={() => { setModifyModal(batch.bid); setMenuOpen(null); }} />
                     <MenuButton icon={<Trash2 size={14} />} label="删除" onClick={() => { setDeleteConfirm(batch.bid); setMenuOpen(null); }} className="text-red-500" />
                   </motion.div>
                 </>
@@ -137,8 +142,7 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
 
       {/* Modals */}
       <HistoryModal bid={historyModal} onClose={() => setHistoryModal(null)} />
-      <EditWeightModal bid={editWeightModal} onClose={() => setEditWeightModal(null)} />
-      <EditStatusModal bid={editStatusModal} onClose={() => setEditStatusModal(null)} />
+      <ModifyBatchModal bid={modifyModal} onClose={() => setModifyModal(null)} />
       <DeleteModal bid={deleteConfirm} onClose={() => setDeleteConfirm(null)} />
     </div>
   );
@@ -198,85 +202,94 @@ function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => voi
   );
 }
 
-function EditWeightModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
+function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
   const batch = useLiveQuery(() => bid ? db.tab_batch.get(bid) : undefined, [bid]);
   const [weight, setWeight] = useState('');
+  const [status, setStatus] = useState<number>(0);
+  const [memo, setMemo] = useState('');
+
+  React.useEffect(() => {
+    if (batch) {
+      setWeight(batch.bcwei.toString());
+      setStatus(batch.bstatus);
+      setMemo(batch.bmemo || '');
+    }
+  }, [batch]);
 
   if (!bid || !batch) return null;
 
   const handleConfirm = async () => {
     const w = parseFloat(weight);
     if (isNaN(w) || w > batch.bowei) return;
-    await db.tab_batch.update(bid, { bcwei: w });
+    await db.tab_batch.update(bid, { 
+      bcwei: w,
+      bstatus: status,
+      bmemo: memo
+    });
     onClose();
   };
 
   return (
-    <Modal title="修改剩余重量" onClose={onClose}>
+    <Modal title="修改批次信息" onClose={onClose}>
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-slate-500 mb-1 block">当前剩余: {formatWeight(batch.bcwei)}t (最大: {formatWeight(batch.bowei)}t)</label>
-          <input 
-            type="number" 
-            step="0.001"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-            placeholder="输入新的剩余吨数"
-          />
+          <label className="text-xs text-slate-500 mb-1 block font-bold">批次状态</label>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => setStatus(1)}
+              className={cn(
+                "flex-1 p-3 rounded-xl border-2 flex items-center justify-center gap-2 transition-all",
+                status === 1 ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-100 text-slate-400"
+              )}
+            >
+              <div className="w-3 h-3 rounded-full bg-[#AFC3A8]" />
+              <span className="text-xs font-bold">可发货</span>
+            </button>
+            <button 
+              onClick={() => setStatus(0)}
+              className={cn(
+                "flex-1 p-3 rounded-xl border-2 flex items-center justify-center gap-2 transition-all",
+                status === 0 ? "border-red-500 bg-red-50 text-red-700" : "border-slate-100 text-slate-400"
+              )}
+            >
+              <div className="w-3 h-3 rounded-full bg-[#FF2525]" />
+              <span className="text-xs font-bold">不可发货</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">剩余吨数</label>
+          <div className="relative">
+            <input 
+              type="number" 
+              step="0.001"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none pr-8 font-mono"
+              placeholder="输入吨数"
+            />
+            <span className="absolute right-3 top-3 text-[10px] text-slate-400">t</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">最大可调至: {formatWeight(batch.bowei)}t</p>
           {parseFloat(weight) > batch.bowei && <p className="text-[10px] text-red-500 mt-1">修改数字不可大于批次总重</p>}
         </div>
+
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">批次备注</label>
+          <textarea 
+            rows={3}
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="输入备注信息..."
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
+          />
+        </div>
+
         <button 
           onClick={handleConfirm}
           disabled={!weight || parseFloat(weight) > batch.bowei}
-          className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold disabled:opacity-50"
-        >
-          确认修改
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-function EditStatusModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
-  const batch = useLiveQuery(() => bid ? db.tab_batch.get(bid) : undefined, [bid]);
-  const [status, setStatus] = useState<number>(0);
-
-  if (!bid || !batch) return null;
-
-  const handleConfirm = async () => {
-    await db.tab_batch.update(bid, { bstatus: status });
-    onClose();
-  };
-
-  return (
-    <Modal title="修改批次状态" onClose={onClose}>
-      <div className="space-y-4">
-        <div className="flex gap-4">
-          <button 
-            onClick={() => setStatus(1)}
-            className={cn(
-              "flex-1 p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all",
-              status === 1 ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-100 text-slate-400"
-            )}
-          >
-            <div className="w-4 h-4 rounded-full bg-[#AFC3A8]" />
-            <span className="text-xs font-bold">可发货</span>
-          </button>
-          <button 
-            onClick={() => setStatus(0)}
-            className={cn(
-              "flex-1 p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all",
-              status === 0 ? "border-red-500 bg-red-50 text-red-700" : "border-slate-100 text-slate-400"
-            )}
-          >
-            <div className="w-4 h-4 rounded-full bg-[#FF2525]" />
-            <span className="text-xs font-bold">不可发货</span>
-          </button>
-        </div>
-        <button 
-          onClick={handleConfirm}
-          className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold"
+          className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold shadow-lg disabled:opacity-50"
         >
           确认修改
         </button>

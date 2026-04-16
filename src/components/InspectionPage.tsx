@@ -6,7 +6,7 @@
 import React from 'react';
 import { db } from '../db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, CheckCircle2, Truck, MapPin, Phone, Calendar, Info, Package } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Truck, MapPin, Phone, Calendar, Info, Package, FileText } from 'lucide-react';
 import { ShipmentState } from '../types';
 import { formatWeight, formatDate } from '../lib/utils';
 import { motion } from 'motion/react';
@@ -16,6 +16,13 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
   const varieties = useLiveQuery(() => db.tab_variaty.toArray());
   const destinations = useLiveQuery(() => db.tab_destination.toArray());
   const allBatches = useLiveQuery(() => db.tab_batch.toArray());
+  const [memo, setMemo] = React.useState('');
+
+  React.useEffect(() => {
+    if (shipment) {
+      setMemo(shipment.smemo || '');
+    }
+  }, [shipment]);
 
   if (!shipment || !varieties || !destinations || !allBatches) return null;
 
@@ -45,7 +52,8 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
       // 2. Update shipment state
       await db.tab_sending_record.update(shipmentId, { 
         sstate: ShipmentState.COMPLETED,
-        sftime: new Date().toISOString()
+        sftime: new Date().toISOString(),
+        smemo: memo
       });
     });
     
@@ -68,12 +76,20 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
           <InfoItem icon={<MapPin size={14} />} label="目的地" value={destinations.find(d => d.did === shipment.sdest)?.dname || ''} />
           <InfoItem icon={<Phone size={14} />} label="司机电话" value={shipment.sdrpn} />
           <InfoItem icon={<Calendar size={14} />} label="创建日期" value={formatDate(shipment.sdate)} />
-          {shipment.smemo && (
-            <div className="col-span-2 pt-2 border-t border-slate-50">
-              <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">备注</div>
-              <p className="text-xs text-slate-600 leading-relaxed">{shipment.smemo}</p>
-            </div>
-          )}
+        </section>
+
+        {/* Remarks Section */}
+        <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-2">
+          <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+            <FileText size={14} /> 备注 (可选)
+          </div>
+          <textarea 
+            rows={3}
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="输入执行此次发货的备注..."
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
+          />
         </section>
 
         {/* Weight Change Inspection */}

@@ -18,8 +18,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
     splate: '',
     sdrpn: '',
     sdest: '',
-    sdate: new Date().toISOString().split('T')[0],
-    smemo: ''
+    sdate: new Date().toISOString().split('T')[0]
   });
 
   const [plannedItems, setPlannedItems] = useState<{ vid: number, weight: number }[]>([]);
@@ -52,7 +51,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
       sdate: formData.sdate,
       spinfo: spinfo,
       sainfo: '',
-      smemo: formData.smemo
+      smemo: ''
     });
     
     onCreated(id as number);
@@ -143,17 +142,6 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
               value={formData.sdate}
               onChange={e => setFormData({...formData, sdate: e.target.value})}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </InputGroup>
-
-          <InputGroup label="备注 (可选)" icon={<FileText size={18} />}>
-            <textarea 
-              maxLength={400}
-              rows={3}
-              value={formData.smemo}
-              onChange={e => setFormData({...formData, smemo: e.target.value})}
-              placeholder="输入备注信息..."
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
             />
           </InputGroup>
         </div>
