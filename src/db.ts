@@ -17,7 +17,7 @@ export class CottonSeedDB extends Dexie {
     this.version(1).stores({
       tab_variaty: '++vid, vname',
       tab_destination: '++did, dname',
-      tab_batch: '++bid, bname, bvid, bstatus',
+      tab_batch: '++bid, bname, bvid, bstatus, bdate',
       tab_sending_record: '++sid, sstate, sdate, splate, sdest'
     });
   }

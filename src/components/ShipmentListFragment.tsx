@@ -28,7 +28,7 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
     if (filterDate) {
       return db.tab_sending_record.where('sdate').equals(filterDate).reverse().toArray();
     }
-    return db.tab_sending_record.reverse().toArray();
+    return db.tab_sending_record.orderBy('sdate').reverse().toArray();
   }, [filterDate]);
 
   const varieties = useLiveQuery(() => db.tab_variaty.toArray());

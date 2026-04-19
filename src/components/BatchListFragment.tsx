@@ -23,7 +23,7 @@ import { cn, formatWeight, formatDate, copyToClipboard } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
-  const batches = useLiveQuery(() => db.tab_batch.toArray());
+  const batches = useLiveQuery(() => db.tab_batch.orderBy('bdate').reverse().toArray());
   const varieties = useLiveQuery(() => db.tab_variaty.toArray());
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [historyModal, setHistoryModal] = useState<number | null>(null);
