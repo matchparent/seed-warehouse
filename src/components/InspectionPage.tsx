@@ -17,10 +17,12 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
   const destinations = useLiveQuery(() => db.tab_destination.toArray());
   const allBatches = useLiveQuery(() => db.tab_batch.toArray());
   const [memo, setMemo] = React.useState('');
+  const [phone, setPhone] = React.useState('');
 
   React.useEffect(() => {
     if (shipment) {
       setMemo(shipment.smemo || '');
+      setPhone(shipment.sdrpn || '');
     }
   }, [shipment]);
 
@@ -53,7 +55,8 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
       await db.tab_sending_record.update(shipmentId, { 
         sstate: ShipmentState.COMPLETED,
         sftime: new Date().toISOString(),
-        smemo: memo
+        smemo: memo,
+        sdrpn: phone
       });
     });
     
@@ -74,22 +77,36 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
         <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-2 gap-4">
           <InfoItem icon={<Truck size={14} />} label="车牌号" value={shipment.splate} />
           <InfoItem icon={<MapPin size={14} />} label="目的地" value={destinations.find(d => d.did === shipment.sdest)?.dname || ''} />
-          <InfoItem icon={<Phone size={14} />} label="司机电话" value={shipment.sdrpn} />
           <InfoItem icon={<Calendar size={14} />} label="创建日期" value={formatDate(shipment.sdate)} />
         </section>
 
-        {/* Remarks Section */}
-        <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-2">
-          <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
-            <FileText size={14} /> 备注 (可选)
+        {/* Input Details Section */}
+        <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+          <div className="space-y-2">
+            <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+              <Phone size={14} /> 司机电话
+            </div>
+            <input 
+              type="tel" 
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="请输入司机电话 (例如: +998...)"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold"
+            />
           </div>
-          <textarea 
-            rows={3}
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="输入执行此次发货的备注..."
-            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
-          />
+
+          <div className="space-y-2">
+            <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+              <FileText size={14} /> 备注 (可选)
+            </div>
+            <textarea 
+              rows={3}
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="输入执行此次发货的备注..."
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
+            />
+          </div>
         </section>
 
         {/* Weight Change Inspection */}

@@ -16,7 +16,6 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
   
   const [formData, setFormData] = useState({
     splate: '',
-    sdrpn: '',
     sdest: '',
     sdate: new Date().toISOString().split('T')[0]
   });
@@ -36,7 +35,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
     setPlannedItems(plannedItems.filter((_, i) => i !== index));
   };
 
-  const isValid = formData.splate && formData.sdrpn && formData.sdest && plannedItems.length > 0;
+  const isValid = formData.splate && formData.sdest && plannedItems.length > 0;
 
   const handleCreate = async () => {
     if (!isValid) return;
@@ -46,7 +45,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
     const id = await db.tab_sending_record.add({
       sstate: ShipmentState.NEW,
       splate: formData.splate,
-      sdrpn: formData.sdrpn,
+      sdrpn: '',
       sdest: parseInt(formData.sdest),
       sdate: formData.sdate,
       spinfo: spinfo,
@@ -125,16 +124,6 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
               )}
             </div>
           </div>
-
-          <InputGroup label="司机电话" icon={<Phone size={18} />}>
-            <input 
-              type="tel" 
-              value={formData.sdrpn}
-              onChange={e => setFormData({...formData, sdrpn: e.target.value})}
-              placeholder="+998..."
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </InputGroup>
 
           <InputGroup label="创建日期" icon={<Calendar size={18} />}>
             <input 
