@@ -6,7 +6,7 @@
 import React from 'react';
 import { db } from '../db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { formatWeight } from '../lib/utils';
+import { formatWeight, addWeights } from '../lib/utils';
 import { ShipmentState } from '../types';
 import { motion } from 'motion/react';
 import { 
@@ -29,9 +29,6 @@ export default function StatisticsFragment() {
   const destinations = useLiveQuery(() => db.tab_destination.toArray());
 
   if (!varieties || !batches || !records || !destinations) return null;
-
-  // Helper for precise decimal addition to avoid float issues
-  const addWeights = (a: number, b: number) => (Math.round(a * 1000) + Math.round(b * 1000)) / 1000;
 
   // 1. Variety Stock
   const varietyStock = varieties.map(v => {

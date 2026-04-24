@@ -9,6 +9,18 @@ export function formatWeight(weight: number): string {
   return weight.toFixed(3);
 }
 
+export function addWeights(a: number, b: number): number {
+  return (Math.round(a * 1000) + Math.round(b * 1000)) / 1000;
+}
+
+export function subWeights(a: number, b: number): number {
+  return (Math.round(a * 1000) - Math.round(b * 1000)) / 1000;
+}
+
+export function isWeightExceeded(weight: number, limit: number): boolean {
+  return Math.round(weight * 1000) > Math.round(limit * 1000);
+}
+
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '-';
   return dateStr.split('T')[0];

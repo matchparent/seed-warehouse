@@ -19,7 +19,7 @@ import {
   Truck,
   FileText
 } from 'lucide-react';
-import { cn, formatWeight, formatDate, copyToClipboard } from '../lib/utils';
+import { cn, formatWeight, formatDate, copyToClipboard, isWeightExceeded } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
@@ -220,7 +220,7 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
 
   const handleConfirm = async () => {
     const w = parseFloat(weight);
-    if (isNaN(w) || w > batch.bowei) return;
+    if (isNaN(w) || isWeightExceeded(w, batch.bowei)) return;
     await db.tab_batch.update(bid, { 
       bcwei: w,
       bstatus: status,
@@ -272,7 +272,7 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
             <span className="absolute right-3 top-3 text-[10px] text-slate-400">t</span>
           </div>
           <p className="text-[10px] text-slate-400 mt-1">最大可调至: {formatWeight(batch.bowei)}t</p>
-          {parseFloat(weight) > batch.bowei && <p className="text-[10px] text-red-500 mt-1">修改数字不可大于批次总重</p>}
+          {isWeightExceeded(parseFloat(weight), batch.bowei) && <p className="text-[10px] text-red-500 mt-1">修改数字不可大于批次总重</p>}
         </div>
 
         <div>
@@ -288,7 +288,7 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
 
         <button 
           onClick={handleConfirm}
-          disabled={!weight || parseFloat(weight) > batch.bowei}
+          disabled={!weight || isWeightExceeded(parseFloat(weight), batch.bowei)}
           className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold shadow-lg disabled:opacity-50"
         >
           确认修改

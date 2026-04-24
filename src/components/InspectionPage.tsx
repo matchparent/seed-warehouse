@@ -8,7 +8,7 @@ import { db } from '../db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, CheckCircle2, Truck, MapPin, Phone, Calendar, Info, Package, FileText } from 'lucide-react';
 import { ShipmentState } from '../types';
-import { formatWeight, formatDate } from '../lib/utils';
+import { formatWeight, formatDate, subWeights } from '../lib/utils';
 import { motion } from 'motion/react';
 
 export default function InspectionPage({ shipmentId, onBack, onFinished }: { shipmentId: number, onBack: () => void, onFinished: () => void }) {
@@ -47,7 +47,7 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
       for (const alloc of allocations) {
         const batch = await db.tab_batch.get(alloc.bid);
         if (batch) {
-          await db.tab_batch.update(alloc.bid, { bcwei: batch.bcwei - alloc.deduct });
+          await db.tab_batch.update(alloc.bid, { bcwei: subWeights(batch.bcwei, alloc.deduct) });
         }
       }
       

@@ -9,7 +9,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, CheckCircle2, Package, Info, AlertCircle, Calendar, Truck } from 'lucide-react';
 import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, formatWeight } from '../lib/utils';
+import { cn, formatWeight, isWeightExceeded } from '../lib/utils';
 
 export default function AllocationPage({ shipmentId, onBack, onComplete }: { shipmentId: number, onBack: () => void, onComplete: () => void }) {
   const shipment = useLiveQuery(() => db.tab_sending_record.get(shipmentId), [shipmentId]);
@@ -51,7 +51,7 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
   const handleSetAllocation = () => {
     const weight = parseFloat(tempWeight);
     const batch = batches.find(b => b.bid === activeBatchId);
-    if (!batch || isNaN(weight) || weight > (batch.bcwei as number)) return;
+    if (!batch || isNaN(weight) || isWeightExceeded(weight, batch.bcwei)) return;
     
     setAllocations(prev => ({ ...prev, [batch.bid as number]: weight }));
     setActiveBatchId(null);
@@ -196,7 +196,7 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
                   placeholder="输入扣除吨数"
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
                 />
-                {parseFloat(tempWeight) > (batches.find(b => b.bid === activeBatchId)?.bcwei || 0) && (
+                {isWeightExceeded(parseFloat(tempWeight), batches.find(b => b.bid === activeBatchId)?.bcwei || 0) && (
                   <div className="flex items-center gap-1 text-red-500 mt-2">
                     <AlertCircle size={12} />
                     <span className="text-[10px] font-bold">超出批次剩余重量！</span>
@@ -207,7 +207,7 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
                 <button onClick={() => setActiveBatchId(null)} className="flex-1 py-2 text-slate-400 font-bold">取消</button>
                 <button 
                   onClick={handleSetAllocation}
-                  disabled={!tempWeight || parseFloat(tempWeight) > (batches.find(b => b.bid === activeBatchId)?.bcwei || 0)}
+                  disabled={!tempWeight || isWeightExceeded(parseFloat(tempWeight), batches.find(b => b.bid === activeBatchId)?.bcwei || 0)}
                   className="flex-1 py-2 bg-emerald-500 text-white rounded-xl font-bold disabled:opacity-50"
                 >
                   确认
