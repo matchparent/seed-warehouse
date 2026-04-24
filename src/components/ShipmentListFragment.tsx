@@ -16,7 +16,9 @@ import {
   AlertCircle,
   RotateCcw,
   Trash2,
-  Filter
+  Filter,
+  MoreVertical,
+  Edit2
 } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 import { ShipmentState } from '../types';
@@ -35,8 +37,10 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
   const destinations = useLiveQuery(() => db.tab_destination.toArray());
   const batches = useLiveQuery(() => db.tab_batch.toArray());
 
+  const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [deleteModal, setDeleteModal] = useState<number | null>(null);
   const [withdrawModal, setWithdrawModal] = useState<number | null>(null);
+  const [modifyModal, setModifyModal] = useState<number | null>(null);
 
   const getStateLabel = (state: ShipmentState) => {
     switch (state) {
@@ -57,14 +61,6 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
         : batches?.find(b => b.bid === parseInt(id))?.bname;
       return { name, weight };
     });
-  };
-
-  const handleLongPress = (id: number, state: ShipmentState) => {
-    if (state === ShipmentState.COMPLETED) {
-      setWithdrawModal(id);
-    } else {
-      setDeleteModal(id);
-    }
   };
 
   return (
@@ -106,17 +102,12 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
           return (
             <motion.div 
               key={record.sid}
-              onContextMenu={(e) => { e.preventDefault(); handleLongPress(record.sid!, record.sstate); }}
-              onTouchStart={(e) => {
-                const timer = setTimeout(() => handleLongPress(record.sid!, record.sstate), 600);
-                e.currentTarget.addEventListener('touchend', () => clearTimeout(timer), { once: true });
-              }}
               onClick={() => {
                 if (record.sstate === ShipmentState.NEW || record.sstate === ShipmentState.ALLOCATED) {
                   onEdit(record.sid!, record.sstate);
                 }
               }}
-              className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 space-y-2 active:bg-slate-50 transition-colors cursor-pointer"
+              className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 space-y-2 active:bg-slate-50 transition-colors cursor-pointer relative"
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2">
@@ -125,10 +116,61 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
                     {stateInfo.label}
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                  <Calendar size={10} /> {formatDate(record.sdate)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <Calendar size={10} /> {formatDate(record.sdate)}
+                  </span>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(menuOpen === record.sid ? null : record.sid || null);
+                    }}
+                    className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors"
+                  >
+                    <MoreVertical size={14} />
+                  </button>
+                </div>
               </div>
+
+              {/* Action Menu */}
+              <AnimatePresence>
+                {menuOpen === record.sid && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={(e) => { e.stopPropagation(); setMenuOpen(null); }} 
+                    />
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      className="absolute right-3 top-10 bg-white shadow-xl border border-slate-100 rounded-xl py-1 z-20 min-w-[120px]"
+                    >
+                      {record.sstate === ShipmentState.COMPLETED ? (
+                        <>
+                          <MenuButton 
+                            icon={<Edit2 size={14} />} 
+                            label="修改备注/电话" 
+                            onClick={() => { setModifyModal(record.sid!); setMenuOpen(null); }} 
+                          />
+                          <MenuButton 
+                            icon={<RotateCcw size={14} />} 
+                            label="撤回发货" 
+                            onClick={() => { setWithdrawModal(record.sid!); setMenuOpen(null); }} 
+                          />
+                        </>
+                      ) : (
+                        <MenuButton 
+                          icon={<Trash2 size={14} />} 
+                          label="删除记录" 
+                          onClick={() => { setDeleteModal(record.sid!); setMenuOpen(null); }} 
+                          className="text-red-500" 
+                        />
+                      )}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
 
               <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                 <Truck size={14} className="text-emerald-500" />
@@ -137,7 +179,7 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
 
               <div className="grid grid-cols-2 gap-2 text-[11px]">
                 <div className="flex items-center gap-1 text-slate-500">
-                  <Phone size={12} /> {record.sdrpn}
+                  <Phone size={12} /> {record.sdrpn || '未填写'}
                 </div>
                 <div className="flex items-center gap-1 text-slate-500 truncate">
                   <MapPin size={12} /> {destinations?.find(d => d.did === record.sdest)?.dname}
@@ -176,7 +218,76 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
 
       <DeleteShipmentModal sid={deleteModal} onClose={() => setDeleteModal(null)} />
       <WithdrawShipmentModal sid={withdrawModal} onClose={() => setWithdrawModal(null)} />
+      <ModifyShipmentModal sid={modifyModal} onClose={() => setModifyModal(null)} />
     </div>
+  );
+}
+
+function MenuButton({ icon, label, onClick, className }: { icon: React.ReactNode, label: string, onClick: () => void, className?: string }) {
+  return (
+    <button 
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className={cn("w-full px-4 py-2 text-left text-xs font-bold flex items-center gap-3 hover:bg-slate-50 transition-colors", className)}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function ModifyShipmentModal({ sid, onClose }: { sid: number | null, onClose: () => void }) {
+  const record = useLiveQuery(() => sid ? db.tab_sending_record.get(sid) : undefined, [sid]);
+  const [memo, setMemo] = useState('');
+  const [phone, setPhone] = useState('');
+
+  React.useEffect(() => {
+    if (record) {
+      setMemo(record.smemo || '');
+      setPhone(record.sdrpn || '');
+    }
+  }, [record]);
+
+  if (!sid || !record) return null;
+
+  const handleConfirm = async () => {
+    await db.tab_sending_record.update(sid, { 
+      smemo: memo,
+      sdrpn: phone
+    });
+    onClose();
+  };
+
+  return (
+    <Modal title="修改记录信息" onClose={onClose}>
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">司机电话</label>
+          <input 
+            type="tel" 
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="输入电话..."
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">发货备注</label>
+          <textarea 
+            rows={3}
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="输入备注信息..."
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
+          />
+        </div>
+        <button 
+          onClick={handleConfirm}
+          className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold shadow-lg"
+        >
+          确认修改
+        </button>
+      </div>
+    </Modal>
   );
 }
 
