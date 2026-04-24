@@ -133,11 +133,29 @@ export default function StatisticsFragment() {
                 cy="50%"
                 innerRadius={40}
                 outerRadius={70}
-                paddingAngle={destStats.length === 1 ? 0 : 5}
+                paddingAngle={0}
                 dataKey="value"
                 nameKey="name"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 labelLine={false}
+                label={({ cx, cy, midAngle, outerRadius, percent, name }) => {
+                  const RADIAN = Math.PI / 180;
+                  // Reduced distance: roughly half of standard offset (std is often 20)
+                  const radius = outerRadius + 8;
+                  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                  return (
+                    <text 
+                      x={x} 
+                      y={y} 
+                      fill="#64748b" 
+                      textAnchor={x > cx ? 'start' : 'end'} 
+                      dominantBaseline="central"
+                      style={{ fontSize: '7px', fontWeight: 'bold' }}
+                    >
+                      {`${name} ${(percent * 100).toFixed(0)}%`}
+                    </text>
+                  );
+                }}
               >
                 {destStats.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

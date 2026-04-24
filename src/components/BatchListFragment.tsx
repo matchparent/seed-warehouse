@@ -41,7 +41,7 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
       .map(b => {
         const vname = getVarietyName(b.bvid);
         const weightStr = `剩余 ${b.bcwei.toFixed(3).padStart(8)} 吨`;
-        const batchInfo = `${b.bid}(${vname})`;
+        const batchInfo = `${b.bname}(${vname})`;
         return `${weightStr}          ${batchInfo}`;
       })
       .join('\n');
