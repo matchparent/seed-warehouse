@@ -336,7 +336,7 @@ function WithdrawShipmentModal({ sid, onClose }: { sid: number | null, onClose: 
           {allocations.map(a => (
             <div key={a.bid} className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
               <span>{a.name}</span>
-              <span className="font-bold text-emerald-600">{a.current}t → {(a.current + a.weight).toFixed(3)}t</span>
+              <span className="font-bold text-emerald-600">{Number(a.current)}t → {(Number(a.current) + Number(a.weight)).toFixed(3)}t</span>
             </div>
           ))}
         </div>

@@ -5,8 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatWeight(weight: number): string {
-  return weight.toFixed(3);
+export function formatWeight(weight: number | string): string {
+  return Number(weight).toFixed(3);
 }
 
 export function addWeights(a: number, b: number): number {
