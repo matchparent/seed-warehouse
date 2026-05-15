@@ -248,23 +248,47 @@ class DataService {
 export const dataService = new DataService();
 
 export function useVarieties() {
-  const dexieData = useLiveQuery(() => db.tab_variaty.toArray());
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const dexieData = useLiveQuery(() => db.tab_variaty.toArray().then(data => data.map(v => ({ ...v, vid: toNum(v.vid) }))));
   const [mysqlData, setMysqlData] = useState<Variety[] | undefined>(undefined);
   useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getVarieties().then(setMysqlData); }, []);
   return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
 }
 
 export function useDestinations() {
-  const dexieData = useLiveQuery(() => db.tab_destination.toArray());
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const dexieData = useLiveQuery(() => db.tab_destination.toArray().then(data => data.map(d => ({ ...d, did: toNum(d.did) }))));
   const [mysqlData, setMysqlData] = useState<Destination[] | undefined>(undefined);
   useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getDestinations().then(setMysqlData); }, []);
   return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
 }
 
 export function useBatches(ordered = true) {
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  };
+
   const dexieData = useLiveQuery(() => {
     const q = db.tab_batch;
-    return ordered ? q.orderBy('bdate').reverse().toArray() : q.toArray();
+    return (ordered ? q.orderBy('bdate').reverse().toArray() : q.toArray()).then(data => 
+      data.map(b => ({
+        ...b,
+        bid: toNum(b.bid),
+        bvid: toNum(b.bvid),
+        bstatus: toNum(b.bstatus),
+        bowei: toNum(b.bowei),
+        bcwei: toNum(b.bcwei)
+      }))
+    );
   }, [ordered]);
   const [mysqlData, setMysqlData] = useState<Batch[] | undefined>(undefined);
   useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getBatches(ordered).then(setMysqlData); }, [ordered]);
@@ -272,11 +296,21 @@ export function useBatches(ordered = true) {
 }
 
 export function useSendingRecords(ordered = true, date?: string) {
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  };
+
   const dexieData = useLiveQuery(() => {
     const q = date 
       ? db.tab_sending_record.where('sdate').equals(date).reverse()
       : db.tab_sending_record.orderBy('sdate').reverse();
-    return q.toArray();
+    return q.toArray().then(data => data.map(r => ({
+      ...r,
+      sid: toNum(r.sid),
+      sstate: toNum(r.sstate),
+      sdest: toNum(r.sdest)
+    })));
   }, [ordered, date]);
   const [mysqlData, setMysqlData] = useState<SendingRecord[] | undefined>(undefined);
   useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getSendingRecords(ordered, date).then(setMysqlData); }, [ordered, date]);

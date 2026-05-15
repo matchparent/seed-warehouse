@@ -6,13 +6,25 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatWeight(weight: number | string | undefined | null): string {
-  const n = Number(weight);
-  return (isNaN(n) ? 0 : n).toFixed(3);
+  try {
+    const n = Number(weight);
+    const val = isNaN(n) || !isFinite(n) ? 0 : n;
+    return Number(val).toFixed(3);
+  } catch (e) {
+    console.error('formatWeight error:', e);
+    return "0.000";
+  }
 }
 
 export function safeToFixed(value: number | string | undefined | null, decimals: number = 3): string {
-  const n = Number(value);
-  return (isNaN(n) ? 0 : n).toFixed(decimals);
+  try {
+    const n = Number(value);
+    const val = isNaN(n) || !isFinite(n) ? 0 : n;
+    return Number(val).toFixed(decimals);
+  } catch (e) {
+    console.error('safeToFixed error:', e);
+    return "0";
+  }
 }
 
 export function addWeights(a: number | string, b: number | string): number {

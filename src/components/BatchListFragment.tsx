@@ -17,7 +17,7 @@ import {
   Truck,
   FileText
 } from 'lucide-react';
-import { cn, formatWeight, formatDate, copyToClipboard, isWeightExceeded } from '../lib/utils';
+import { cn, formatWeight, formatDate, copyToClipboard, isWeightExceeded, safeToFixed } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBatches, useVarieties, useSendingRecords, useBatch, dataService } from '../lib/dataService';
 
