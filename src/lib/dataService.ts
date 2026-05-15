@@ -52,7 +52,10 @@ class DataService {
   }
 
   async getVarieties(): Promise<Variety[]> {
-    if (this.mode === 'dexie') return db.tab_variaty.toArray();
+    if (this.mode === 'dexie') {
+      const data = await db.tab_variaty.toArray();
+      return data.map(v => ({ ...v, vid: Number(v.vid) }));
+    }
     const res = await fetch('/api/tab_variaty');
     const data = await res.json();
     return data.map((v: any) => ({
@@ -62,7 +65,10 @@ class DataService {
   }
 
   async getDestinations(): Promise<Destination[]> {
-    if (this.mode === 'dexie') return db.tab_destination.toArray();
+    if (this.mode === 'dexie') {
+      const data = await db.tab_destination.toArray();
+      return data.map(d => ({ ...d, did: Number(d.did) }));
+    }
     const res = await fetch('/api/tab_destination');
     const data = await res.json();
     return data.map((d: any) => ({
@@ -72,36 +78,60 @@ class DataService {
   }
 
   async getBatches(ordered = true): Promise<Batch[]> {
+    const toNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    };
+
     if (this.mode === 'dexie') {
       const q = db.tab_batch;
-      return ordered ? q.orderBy('bdate').reverse().toArray() : q.toArray();
+      const data = await (ordered ? q.orderBy('bdate').reverse().toArray() : q.toArray());
+      return data.map(b => ({
+        ...b,
+        bid: toNum(b.bid),
+        bvid: toNum(b.bvid),
+        bstatus: toNum(b.bstatus),
+        bowei: toNum(b.bowei),
+        bcwei: toNum(b.bcwei)
+      }));
     }
     const res = await fetch(ordered ? '/api/tab_batch/ordered' : '/api/tab_batch');
     const data = await res.json();
     // Normalize decimals from MySQL
     return data.map((b: any) => ({
       ...b,
-      bowei: Number(b.bowei),
-      bcwei: Number(b.bcwei)
+      bid: toNum(b.bid),
+      bvid: toNum(b.bvid),
+      bstatus: toNum(b.bstatus),
+      bowei: toNum(b.bowei),
+      bcwei: toNum(b.bcwei)
     }));
   }
 
   async getSendingRecords(ordered = true, date?: string): Promise<SendingRecord[]> {
+    const toNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    };
+
+    let data: any[];
     if (this.mode === 'dexie') {
       const q = date 
         ? db.tab_sending_record.where('sdate').equals(date).reverse()
         : db.tab_sending_record.orderBy('sdate').reverse();
-      return q.toArray();
+      data = await q.toArray();
+    } else {
+      let url = ordered ? '/api/tab_sending_record/ordered' : '/api/tab_sending_record';
+      if (date) url = `/api/tab_sending_record?sdate=${date}`;
+      const res = await fetch(url);
+      data = await res.json();
     }
-    let url = ordered ? '/api/tab_sending_record/ordered' : '/api/tab_sending_record';
-    if (date) url = `/api/tab_sending_record?sdate=${date}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    // Normalize fields if needed (sstate might be string in some DBs, though defined as float? no, sstate usually integer)
+
     return data.map((r: any) => ({
       ...r,
-      sstate: Number(r.sstate),
-      sdest: Number(r.sdest)
+      sid: toNum(r.sid),
+      sstate: toNum(r.sstate),
+      sdest: toNum(r.sdest)
     }));
   }
 

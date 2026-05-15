@@ -312,11 +312,13 @@ function WithdrawShipmentModal({ sid, onClose }: { sid: number | null, onClose: 
 
   if (!sid || !record) return null;
 
-  const allocations = record.sainfo.split(',').map(item => {
-    const [bid, weight] = item.split('/');
+  const allocations = (record.sainfo || '').split(',').map(item => {
+    const parts = item.split('/');
+    if (parts.length < 2) return null;
+    const [bid, weight] = parts;
     const batch = batches?.find(b => b.bid === parseInt(bid));
     return { bid: parseInt(bid), name: batch?.bname, current: batch?.bcwei || 0, weight: parseFloat(weight) };
-  });
+  }).filter((a): a is NonNullable<typeof a> => a !== null);
 
   const handleConfirm = async () => {
     // MySQL mode doesn't support Dexie transactions, but we can do sequential updates here

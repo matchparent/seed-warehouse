@@ -27,8 +27,10 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
 
   if (!shipment || !varieties || !destinations || !allBatches) return null;
 
-  const allocations = shipment.sainfo.split(',').map(item => {
-    const [bid, weight] = item.split('/');
+  const allocations = (shipment.sainfo || '').split(',').map(item => {
+    const parts = item.split('/');
+    if (parts.length < 2) return null;
+    const [bid, weight] = parts;
     const batch = allBatches.find(b => b.bid === parseInt(bid));
     const variety = varieties.find(v => v.vid === batch?.bvid);
     return { 
@@ -38,7 +40,7 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
       current: batch?.bcwei || 0, 
       deduct: parseFloat(weight) 
     };
-  });
+  }).filter((a): a is NonNullable<typeof a> => a !== null);
 
   const handleFinish = async () => {
     // 1. Update batch weights

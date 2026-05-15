@@ -41,12 +41,12 @@ export default function StatisticsFragment() {
 
   // 2. Destination Stats
   const destStats = destinations.map(d => {
-    // Use loose equality or Number conversion to handle potential type mismatches
+    // Use Number conversion to handle potential type mismatches
     const dRecords = records.filter(r => Number(r.sdest) === Number(d.did));
     const total = dRecords.reduce((sum, r) => {
-      if (!r.sainfo) return sum;
+      const info = r.sainfo || '';
       // Split and clean each item before parsing
-      const recordTotal = r.sainfo.split(',').reduce((acc, s) => {
+      const recordTotal = info.split(',').reduce((acc, s) => {
         const parts = s.trim().split('/');
         if (parts.length < 2) return acc;
         const w = parseFloat(parts[1]);
@@ -54,8 +54,8 @@ export default function StatisticsFragment() {
       }, 0);
       return addWeights(sum, recordTotal);
     }, 0);
-    return { name: (d.dname || '未知').split('/')[0], value: Number(total) };
-  }).filter(d => d.value > 0);
+    return { name: (d.dname || '未知').split('/')[0], value: Number(total) || 0 };
+  }).filter(d => (d.value || 0) > 0);
 
   // 3. Daily Stats
   const dailyData: any[] = [];
@@ -68,8 +68,8 @@ export default function StatisticsFragment() {
     
     varieties.forEach(v => {
       const vTotal = dayRecords.reduce((sum, r) => {
-        if (!r.sainfo) return sum;
-        const recordVTotal = r.sainfo.split(',').reduce((acc, s) => {
+        const info = r.sainfo || '';
+        const recordVTotal = info.split(',').reduce((acc, s) => {
           const parts = s.split('/');
           if (parts.length < 2) return acc;
           const [bid, weight] = parts;
@@ -82,7 +82,7 @@ export default function StatisticsFragment() {
         }, 0);
         return addWeights(sum, recordVTotal);
       }, 0);
-      row[v.vname] = vTotal;
+      row[v.vname] = Number(vTotal) || 0;
       dayTotal = addWeights(dayTotal, vTotal);
     });
     row.total = dayTotal;

@@ -16,11 +16,19 @@ export function safeToFixed(value: number | string | undefined | null, decimals:
 }
 
 export function addWeights(a: number | string, b: number | string): number {
-  return (Math.round(Number(a) * 1000) + Math.round(Number(b) * 1000)) / 1000;
+  const n1 = Number(a);
+  const n2 = Number(b);
+  const v1 = isNaN(n1) ? 0 : n1;
+  const v2 = isNaN(n2) ? 0 : n2;
+  return (Math.round(v1 * 1000) + Math.round(v2 * 1000)) / 1000;
 }
 
 export function subWeights(a: number | string, b: number | string): number {
-  return (Math.round(Number(a) * 1000) - Math.round(Number(b) * 1000)) / 1000;
+  const n1 = Number(a);
+  const n2 = Number(b);
+  const v1 = isNaN(n1) ? 0 : n1;
+  const v2 = isNaN(n2) ? 0 : n2;
+  return (Math.round(v1 * 1000) - Math.round(v2 * 1000)) / 1000;
 }
 
 export function isWeightExceeded(weight: number | string, limit: number | string): boolean {
