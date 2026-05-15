@@ -54,7 +54,7 @@ export default function StatisticsFragment() {
       }, 0);
       return addWeights(sum, recordTotal);
     }, 0);
-    return { name: d.dname.split('/')[0], value: total };
+    return { name: (d.dname || '未知').split('/')[0], value: Number(total) };
   }).filter(d => d.value > 0);
 
   // 3. Daily Stats
@@ -63,7 +63,7 @@ export default function StatisticsFragment() {
   
   dates.forEach(date => {
     const dayRecords = records.filter(r => r.sdate === date);
-    const row: any = { date: date.split('-').slice(1).join('-') };
+    const row: any = { date: (date || '').split('-').slice(1).join('-') };
     let dayTotal = 0;
     
     varieties.forEach(v => {
@@ -73,7 +73,7 @@ export default function StatisticsFragment() {
           const parts = s.split('/');
           if (parts.length < 2) return acc;
           const [bid, weight] = parts;
-          const batch = batches.find(b => b.bid === parseInt(bid));
+          const batch = batches.find(b => b.bid === Number(bid));
           const w = parseFloat(weight);
           if (batch?.bvid === v.vid && !isNaN(w)) {
             return addWeights(acc, w);
@@ -149,7 +149,7 @@ export default function StatisticsFragment() {
                       dominantBaseline="central"
                       style={{ fontSize: '7px', fontWeight: 'bold' }}
                     >
-                      {`${name} ${(percent * 100).toFixed(0)}%`}
+                      {`${name} ${Number(percent * 100).toFixed(0)}%`}
                     </text>
                   );
                 }}

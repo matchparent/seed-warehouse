@@ -9,16 +9,16 @@ export function formatWeight(weight: number | string): string {
   return Number(weight).toFixed(3);
 }
 
-export function addWeights(a: number, b: number): number {
-  return (Math.round(a * 1000) + Math.round(b * 1000)) / 1000;
+export function addWeights(a: number | string, b: number | string): number {
+  return (Math.round(Number(a) * 1000) + Math.round(Number(b) * 1000)) / 1000;
 }
 
-export function subWeights(a: number, b: number): number {
-  return (Math.round(a * 1000) - Math.round(b * 1000)) / 1000;
+export function subWeights(a: number | string, b: number | string): number {
+  return (Math.round(Number(a) * 1000) - Math.round(Number(b) * 1000)) / 1000;
 }
 
-export function isWeightExceeded(weight: number, limit: number): boolean {
-  return Math.round(weight * 1000) > Math.round(limit * 1000);
+export function isWeightExceeded(weight: number | string, limit: number | string): boolean {
+  return Math.round(Number(weight) * 1000) > Math.round(Number(limit) * 1000);
 }
 
 export function formatDate(dateStr: string): string {

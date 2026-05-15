@@ -38,7 +38,7 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
     return plannedItems.map(plan => {
       const allocated = Object.entries(allocations).reduce((sum, [bid, weight]) => {
         const batch = batches.find(b => b.bid === parseInt(bid));
-        return batch?.bvid === plan.vid ? sum + (weight as number) : sum;
+        return batch?.bvid === plan.vid ? sum + Number(weight) : sum;
       }, 0);
       const percent = (allocated / plan.weight) * 100;
       return { ...plan, allocated, percent };
