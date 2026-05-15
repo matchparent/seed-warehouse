@@ -54,13 +54,21 @@ class DataService {
   async getVarieties(): Promise<Variety[]> {
     if (this.mode === 'dexie') return db.tab_variaty.toArray();
     const res = await fetch('/api/tab_variaty');
-    return res.json();
+    const data = await res.json();
+    return data.map((v: any) => ({
+      ...v,
+      vid: Number(v.vid)
+    }));
   }
 
   async getDestinations(): Promise<Destination[]> {
     if (this.mode === 'dexie') return db.tab_destination.toArray();
     const res = await fetch('/api/tab_destination');
-    return res.json();
+    const data = await res.json();
+    return data.map((d: any) => ({
+      ...d,
+      did: Number(d.did)
+    }));
   }
 
   async getBatches(ordered = true): Promise<Batch[]> {
@@ -69,7 +77,13 @@ class DataService {
       return ordered ? q.orderBy('bdate').reverse().toArray() : q.toArray();
     }
     const res = await fetch(ordered ? '/api/tab_batch/ordered' : '/api/tab_batch');
-    return res.json();
+    const data = await res.json();
+    // Normalize decimals from MySQL
+    return data.map((b: any) => ({
+      ...b,
+      bowei: Number(b.bowei),
+      bcwei: Number(b.bcwei)
+    }));
   }
 
   async getSendingRecords(ordered = true, date?: string): Promise<SendingRecord[]> {
@@ -82,7 +96,13 @@ class DataService {
     let url = ordered ? '/api/tab_sending_record/ordered' : '/api/tab_sending_record';
     if (date) url = `/api/tab_sending_record?sdate=${date}`;
     const res = await fetch(url);
-    return res.json();
+    const data = await res.json();
+    // Normalize fields if needed (sstate might be string in some DBs, though defined as float? no, sstate usually integer)
+    return data.map((r: any) => ({
+      ...r,
+      sstate: Number(r.sstate),
+      sdest: Number(r.sdest)
+    }));
   }
 
   async addBatch(batch: Omit<Batch, 'bid'>): Promise<number> {

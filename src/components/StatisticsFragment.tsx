@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { formatWeight, addWeights } from '../lib/utils';
+import { formatWeight, addWeights, safeToFixed } from '../lib/utils';
 import { ShipmentState } from '../types';
 import { motion } from 'motion/react';
 import { 
@@ -111,7 +111,7 @@ export default function StatisticsFragment() {
                   className="h-full bg-emerald-500"
                 />
               </div>
-              <div className="text-[10px] text-right text-emerald-600 font-bold">{Number(s.percent).toFixed(1)}% 剩余</div>
+              <div className="text-[10px] text-right text-emerald-600 font-bold">{safeToFixed(s.percent, 1)}% 剩余</div>
             </div>
           ))}
         </div>
@@ -149,7 +149,7 @@ export default function StatisticsFragment() {
                       dominantBaseline="central"
                       style={{ fontSize: '7px', fontWeight: 'bold' }}
                     >
-                      {`${name} ${Number(percent * 100).toFixed(0)}%`}
+                      {`${name} ${safeToFixed((percent || 0) * 100, 0)}%`}
                     </text>
                   );
                 }}
@@ -158,7 +158,7 @@ export default function StatisticsFragment() {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value: any) => `${Number(value).toFixed(3)}t`} />
+              <Tooltip formatter={(value: any) => `${safeToFixed(value, 3)}t`} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -167,7 +167,7 @@ export default function StatisticsFragment() {
             <div key={i} className="flex items-center gap-2 text-[10px]">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
               <span className="text-slate-500 truncate">{d.name}:</span>
-              <span className="font-bold text-slate-700">{Number(d.value).toFixed(3)}t</span>
+              <span className="font-bold text-slate-700">{safeToFixed(d.value, 3)}t</span>
             </div>
           ))}
         </div>
@@ -194,11 +194,11 @@ export default function StatisticsFragment() {
                   <td className="py-2 text-slate-500 font-medium">{row.date}</td>
                   {varieties.map(v => (
                     <td key={v.vid} className="text-right py-2 text-slate-600">
-                      {row[v.vname] > 0 ? Number(row[v.vname]).toFixed(3) : '-'}
+                      {row[v.vname] > 0 ? safeToFixed(row[v.vname], 3) : '-'}
                     </td>
                   ))}
                   <td className="text-right py-2 font-bold text-emerald-600">
-                    {Number(row.total).toFixed(3)}t
+                    {safeToFixed(row.total, 3)}t
                   </td>
                 </tr>
               ))}

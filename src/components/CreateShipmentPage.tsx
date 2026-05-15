@@ -8,6 +8,7 @@ import { ArrowLeft, Plus, Trash2, Truck, MapPin, Phone, FileText, Calendar } fro
 import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useVarieties, useDestinations, dataService } from '../lib/dataService';
+import { safeToFixed } from '../lib/utils';
 
 export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () => void, onCreated: (id: number) => void }) {
   const varieties = useVarieties();
@@ -109,7 +110,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
                     {varieties?.find(v => v.vid === item.vid)?.vname}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-mono font-bold text-emerald-600">{Number(item.weight).toFixed(3)}t</span>
+                    <span className="text-sm font-mono font-bold text-emerald-600">{safeToFixed(item.weight, 3)}t</span>
                     <button onClick={() => handleRemoveItem(i)} className="text-red-400 hover:text-red-600">
                       <Trash2 size={16} />
                     </button>

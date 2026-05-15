@@ -39,7 +39,7 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
       .filter(b => b.bcwei > 0)
       .map(b => {
         const vname = getVarietyName(b.bvid);
-        const weightStr = `剩余 ${Number(b.bcwei).toFixed(3).padStart(8)} 吨`;
+        const weightStr = `剩余 ${safeToFixed(b.bcwei, 3).padStart(8)} 吨`;
         const batchInfo = `${b.bname}(${vname})`;
         return `${weightStr}          ${batchInfo}`;
       })
