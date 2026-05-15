@@ -11,6 +11,8 @@ export class CottonSeedDB extends Dexie {
   tab_destination!: Table<Destination, number>;
   tab_batch!: Table<Batch, number>;
   tab_sending_record!: Table<SendingRecord, number>;
+  tab_user!: Table<{ uid?: number, spellname: string, key: string }, number>;
+  tab_record!: Table<{ rid?: number, spellname: string, desc: string, optime: string }, number>;
 
   constructor() {
     super('CottonSeedDB');
@@ -18,7 +20,9 @@ export class CottonSeedDB extends Dexie {
       tab_variaty: '++vid, vname',
       tab_destination: '++did, dname',
       tab_batch: '++bid, bname, bvid, bstatus, bdate',
-      tab_sending_record: '++sid, sstate, sdate, splate, sdest'
+      tab_sending_record: '++sid, sstate, sdate, splate, sdest',
+      tab_user: '++uid, spellname, key',
+      tab_record: '++rid, spellname, optime'
     });
   }
 }
@@ -53,6 +57,14 @@ export async function initDB() {
       await db.tab_destination.bulkPut(
         uzbekStates.map((name, i) => ({ did: i + 1, dname: name }))
       );
+    }
+
+    const userCount = await db.tab_user.count();
+    if (userCount === 0) {
+      await db.tab_user.add({
+        spellname: 'BianJiang',
+        key: 'U2FsdGVkX18mX9TVixXl9qnwMi9z2Mc6C1oaKzLc8Ow='
+      });
     }
   } finally {
     isInitializing = false;

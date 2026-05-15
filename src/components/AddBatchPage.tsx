@@ -4,13 +4,12 @@
  */
 
 import React, { useState } from 'react';
-import { db } from '../db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Save, Calendar, Truck, Tag, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useVarieties, dataService } from '../lib/dataService';
 
 export default function AddBatchPage({ onBack }: { onBack: () => void }) {
-  const varieties = useLiveQuery(() => db.tab_variaty.toArray());
+  const varieties = useVarieties();
   const [formData, setFormData] = useState({
     bname: '',
     bvid: '',
@@ -25,7 +24,7 @@ export default function AddBatchPage({ onBack }: { onBack: () => void }) {
   const handleSubmit = async () => {
     if (!isValid) return;
     const weight = parseFloat(formData.bowei);
-    await db.tab_batch.add({
+    await dataService.addBatch({
       bname: formData.bname,
       bvid: parseInt(formData.bvid),
       bdate: formData.bdate,

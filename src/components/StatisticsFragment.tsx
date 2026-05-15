@@ -4,8 +4,6 @@
  */
 
 import React from 'react';
-import { db } from '../db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { formatWeight, addWeights } from '../lib/utils';
 import { ShipmentState } from '../types';
 import { motion } from 'motion/react';
@@ -21,12 +19,14 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { useVarieties, useBatches, useSendingRecords, useDestinations } from '../lib/dataService';
 
 export default function StatisticsFragment() {
-  const varieties = useLiveQuery(() => db.tab_variaty.toArray());
-  const batches = useLiveQuery(() => db.tab_batch.toArray());
-  const records = useLiveQuery(() => db.tab_sending_record.where('sstate').equals(ShipmentState.COMPLETED).toArray());
-  const destinations = useLiveQuery(() => db.tab_destination.toArray());
+  const varieties = useVarieties();
+  const batches = useBatches();
+  const allRecords = useSendingRecords();
+  const records = allRecords?.filter(r => r.sstate === ShipmentState.COMPLETED);
+  const destinations = useDestinations();
 
   if (!varieties || !batches || !records || !destinations) return null;
 

@@ -4,15 +4,14 @@
  */
 
 import React, { useState } from 'react';
-import { db } from '../db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Plus, Trash2, Truck, MapPin, Phone, FileText, Calendar } from 'lucide-react';
 import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { useVarieties, useDestinations, dataService } from '../lib/dataService';
 
 export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () => void, onCreated: (id: number) => void }) {
-  const varieties = useLiveQuery(() => db.tab_variaty.toArray());
-  const destinations = useLiveQuery(() => db.tab_destination.toArray());
+  const varieties = useVarieties();
+  const destinations = useDestinations();
   
   const [formData, setFormData] = useState({
     splate: '',
@@ -42,7 +41,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
     
     const spinfo = plannedItems.map(item => `${item.vid}/${item.weight}`).join(',');
     
-    const id = await db.tab_sending_record.add({
+    const id = await dataService.addSendingRecord({
       sstate: ShipmentState.NEW,
       splate: formData.splate,
       sdrpn: '',
@@ -53,7 +52,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
       smemo: ''
     });
     
-    onCreated(id as number);
+    onCreated(id);
   };
 
   return (

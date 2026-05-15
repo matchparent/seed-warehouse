@@ -4,18 +4,17 @@
  */
 
 import React from 'react';
-import { db } from '../db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, CheckCircle2, Truck, MapPin, Phone, Calendar, Info, Package, FileText } from 'lucide-react';
 import { ShipmentState } from '../types';
 import { formatWeight, formatDate, subWeights } from '../lib/utils';
 import { motion } from 'motion/react';
+import { useSendingRecord, useVarieties, useDestinations, useBatches, dataService } from '../lib/dataService';
 
 export default function InspectionPage({ shipmentId, onBack, onFinished }: { shipmentId: number, onBack: () => void, onFinished: () => void }) {
-  const shipment = useLiveQuery(() => db.tab_sending_record.get(shipmentId), [shipmentId]);
-  const varieties = useLiveQuery(() => db.tab_variaty.toArray());
-  const destinations = useLiveQuery(() => db.tab_destination.toArray());
-  const allBatches = useLiveQuery(() => db.tab_batch.toArray());
+  const shipment = useSendingRecord(shipmentId);
+  const varieties = useVarieties();
+  const destinations = useDestinations();
+  const allBatches = useBatches();
   const [memo, setMemo] = React.useState('');
   const [phone, setPhone] = React.useState('');
 
@@ -42,22 +41,17 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
   });
 
   const handleFinish = async () => {
-    await db.transaction('rw', db.tab_batch, db.tab_sending_record, async () => {
-      // 1. Update batch weights
-      for (const alloc of allocations) {
-        const batch = await db.tab_batch.get(alloc.bid);
-        if (batch) {
-          await db.tab_batch.update(alloc.bid, { bcwei: subWeights(batch.bcwei, alloc.deduct) });
-        }
-      }
-      
-      // 2. Update shipment state
-      await db.tab_sending_record.update(shipmentId, { 
-        sstate: ShipmentState.COMPLETED,
-        sftime: new Date().toISOString(),
-        smemo: memo,
-        sdrpn: phone
-      });
+    // 1. Update batch weights
+    for (const alloc of allocations) {
+      await dataService.updateBatch(alloc.bid, { bcwei: subWeights(alloc.current, alloc.deduct) });
+    }
+    
+    // 2. Update shipment state
+    await dataService.updateSendingRecord(shipmentId, { 
+      sstate: ShipmentState.COMPLETED,
+      sftime: new Date().toISOString(),
+      smemo: memo,
+      sdrpn: phone
     });
     
     onFinished();

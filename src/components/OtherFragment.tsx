@@ -4,16 +4,39 @@
  */
 
 import { db } from '../db';
-import { Database, FileSpreadsheet, Download, ShieldCheck } from 'lucide-react';
+import { Database, FileSpreadsheet, Download, ShieldCheck, Server, Globe } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ShipmentState } from '../types';
+import { dataService, DBMode } from '../lib/dataService';
+import React, { useState, useEffect } from 'react';
+import { cn } from '../lib/utils';
 
 export default function OtherFragment() {
+  const dbMode = dataService.getMode();
+  const [mysqlStatus, setMysqlStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
+
+  useEffect(() => {
+    if (dbMode === 'mysql') {
+      checkMysql();
+    }
+  }, [dbMode]);
+
+  const checkMysql = async () => {
+    try {
+      const res = await fetch('/api/db/status');
+      const data = await res.json();
+      setMysqlStatus(data.status === 'connected' ? 'connected' : 'disconnected');
+    } catch {
+      setMysqlStatus('disconnected');
+    }
+  };
+
   const exportSQL = async () => {
-    const varieties = await db.tab_variaty.toArray();
-    const destinations = await db.tab_destination.toArray();
-    const batches = await db.tab_batch.toArray();
-    const records = await db.tab_sending_record.toArray();
+    const varieties = await dataService.getVarieties();
+    const destinations = await dataService.getDestinations();
+    const batches = await dataService.getBatches(false);
+    const records = await dataService.getSendingRecords(false);
+    // ... rest of exportSQL
 
     let sql = `-- Cotton Seed Warehouse Export\n-- Date: ${new Date().toLocaleString()}\n\n`;
 
@@ -38,15 +61,15 @@ export default function OtherFragment() {
   };
 
   const exportExcel = async () => {
-    const allRecords = await db.tab_sending_record.toArray();
-    // Filter for completed shipments only
+    const allRecords = await dataService.getSendingRecords(false);
     const records = allRecords.filter(r => r.sstate === ShipmentState.COMPLETED);
     
-    const varieties = await db.tab_variaty.toArray();
-    const destinations = await db.tab_destination.toArray();
-    const batches = await db.tab_batch.toArray();
+    const varieties = await dataService.getVarieties();
+    const destinations = await dataService.getDestinations();
+    const batches = await dataService.getBatches(false);
 
     const rows: any[] = [];
+    // ... rest of exportExcel logic is same
     records.forEach(r => {
       const destName = destinations.find(d => d.did === r.sdest)?.dname || '未知';
 
@@ -78,12 +101,67 @@ export default function OtherFragment() {
 
   return (
     <div className="space-y-4">
+      {/* Database Status */}
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Server size={16} className="text-emerald-600" />
+          <h3 className="text-sm font-bold text-slate-700">当前存储模式</h3>
+        </div>
+        
+        <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+          <div className={cn(
+            "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+            dbMode === 'mysql' ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600"
+          )}>
+            {dbMode === 'mysql' ? <Globe size={20} /> : <ShieldCheck size={20} />}
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-bold text-slate-700">
+              {dbMode === 'mysql' ? "远程数据库 (MySQL)" : "浏览器本地数据库 (Dexie)"}
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {dbMode === 'mysql' ? "系统已根据环境变量自动启用 MySQL 存储模式" : "未检测到远程数据库配置，当前使用本地存储模式"}
+            </div>
+          </div>
+        </div>
+
+        {dbMode === 'mysql' && (
+          <div className={cn(
+            "mt-2 p-2 rounded-lg text-[10px] flex items-center justify-between",
+            mysqlStatus === 'connected' ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+          )}>
+            <div className="flex items-center gap-1">
+              <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", mysqlStatus === 'connected' ? "bg-emerald-500" : "bg-red-500")} />
+              {mysqlStatus === 'connected' ? "MySQL 服务已连接" : "MySQL 服务连接异常，请检查后端配置"}
+            </div>
+            <button onClick={checkMysql} className="underline">立即重试</button>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center space-y-2">
         <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
           <ShieldCheck size={32} />
         </div>
         <h3 className="font-bold text-slate-800">数据安全与导出</h3>
-        <p className="text-xs text-slate-400 px-4">所有数据均存储在本地浏览器中，无需网络即可使用。建议定期导出备份。</p>
+        <p className="text-xs text-slate-400 px-4">
+          {dbMode === 'mysql' 
+            ? "当前数据存储在 MySQL 远程服务器中，由后端系统统一管理。" 
+            : "当前数据由于未检测到配置，存储在您的浏览器本地，建议定期导出备份。"}
+        </p>
+      </div>
+
+      <div className="grid gap-3 pt-2">
+        <button 
+          onClick={() => {
+            localStorage.removeItem('auth_user');
+            window.location.reload();
+          }}
+          className="w-full py-4 bg-white border border-slate-100 text-red-500 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-2"
+        >
+          <ShieldCheck size={18} />
+          退出当前授权
+        </button>
       </div>
 
       <div className="grid gap-3">

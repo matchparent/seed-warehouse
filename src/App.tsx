@@ -34,6 +34,8 @@ import AddBatchPage from './components/AddBatchPage';
 import CreateShipmentPage from './components/CreateShipmentPage';
 import AllocationPage from './components/AllocationPage';
 import InspectionPage from './components/InspectionPage';
+import LoginPage from './components/LoginPage';
+import { dataService } from './lib/dataService';
 
 // --- Fragments ---
 import BatchListFragment from './components/BatchListFragment';
@@ -48,9 +50,15 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>('main');
   const [selectedShipmentId, setSelectedShipmentId] = useState<number | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('auth_user'));
 
   useEffect(() => {
-    initDB().then(() => setIsInitialized(true));
+    async function start() {
+      await dataService.init();
+      await initDB();
+      setIsInitialized(true);
+    }
+    start();
   }, []);
 
   if (!isInitialized) {
@@ -60,6 +68,14 @@ export default function App() {
           <div className="w-16 h-16 bg-emerald-200 rounded-full mb-4"></div>
           <div className="h-4 w-32 bg-emerald-200 rounded"></div>
         </div>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen shadow-2xl relative overflow-hidden font-sans">
+        <LoginPage onLoginSuccess={() => setIsLoggedIn(true)} />
       </div>
     );
   }

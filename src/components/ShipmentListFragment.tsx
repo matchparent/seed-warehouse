@@ -4,8 +4,6 @@
  */
 
 import React, { useState } from 'react';
-import { db } from '../db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { 
   Plus, 
   Truck, 
@@ -23,19 +21,14 @@ import {
 import { cn, formatDate } from '../lib/utils';
 import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { useSendingRecords, useVarieties, useDestinations, useBatches, useBatch, useSendingRecord, dataService } from '../lib/dataService';
 
 export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => void, onEdit: (id: number, state: ShipmentState) => void }) {
   const [filterDate, setFilterDate] = useState<string>('');
-  const records = useLiveQuery(() => {
-    if (filterDate) {
-      return db.tab_sending_record.where('sdate').equals(filterDate).reverse().toArray();
-    }
-    return db.tab_sending_record.orderBy('sdate').reverse().toArray();
-  }, [filterDate]);
-
-  const varieties = useLiveQuery(() => db.tab_variaty.toArray());
-  const destinations = useLiveQuery(() => db.tab_destination.toArray());
-  const batches = useLiveQuery(() => db.tab_batch.toArray());
+  const records = useSendingRecords(true, filterDate);
+  const varieties = useVarieties();
+  const destinations = useDestinations();
+  const batches = useBatches();
 
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [deleteModal, setDeleteModal] = useState<number | null>(null);
@@ -236,7 +229,7 @@ function MenuButton({ icon, label, onClick, className }: { icon: React.ReactNode
 }
 
 function ModifyShipmentModal({ sid, onClose }: { sid: number | null, onClose: () => void }) {
-  const record = useLiveQuery(() => sid ? db.tab_sending_record.get(sid) : undefined, [sid]);
+  const record = useSendingRecord(sid);
   const [memo, setMemo] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -250,7 +243,7 @@ function ModifyShipmentModal({ sid, onClose }: { sid: number | null, onClose: ()
   if (!sid || !record) return null;
 
   const handleConfirm = async () => {
-    await db.tab_sending_record.update(sid, { 
+    await dataService.updateSendingRecord(sid, { 
       smemo: memo,
       sdrpn: phone
     });
@@ -294,7 +287,7 @@ function ModifyShipmentModal({ sid, onClose }: { sid: number | null, onClose: ()
 function DeleteShipmentModal({ sid, onClose }: { sid: number | null, onClose: () => void }) {
   if (!sid) return null;
   const handleConfirm = async () => {
-    await db.tab_sending_record.delete(sid);
+    await dataService.deleteSendingRecord(sid);
     onClose();
   };
   return (
@@ -314,8 +307,8 @@ function DeleteShipmentModal({ sid, onClose }: { sid: number | null, onClose: ()
 }
 
 function WithdrawShipmentModal({ sid, onClose }: { sid: number | null, onClose: () => void }) {
-  const record = useLiveQuery(() => sid ? db.tab_sending_record.get(sid) : undefined, [sid]);
-  const batches = useLiveQuery(() => db.tab_batch.toArray());
+  const record = useSendingRecord(sid);
+  const batches = useBatches();
 
   if (!sid || !record) return null;
 
@@ -326,15 +319,12 @@ function WithdrawShipmentModal({ sid, onClose }: { sid: number | null, onClose: 
   });
 
   const handleConfirm = async () => {
-    await db.transaction('rw', db.tab_batch, db.tab_sending_record, async () => {
-      for (const alloc of allocations) {
-        const batch = await db.tab_batch.get(alloc.bid);
-        if (batch) {
-          await db.tab_batch.update(alloc.bid, { bcwei: batch.bcwei + alloc.weight });
-        }
-      }
-      await db.tab_sending_record.update(sid, { sstate: ShipmentState.WITHDRAWN });
-    });
+    // MySQL mode doesn't support Dexie transactions, but we can do sequential updates here
+    // In a real production app, the backend would handle the transaction.
+    for (const alloc of allocations) {
+      await dataService.updateBatch(alloc.bid, { bcwei: alloc.current + alloc.weight });
+    }
+    await dataService.updateSendingRecord(sid, { sstate: ShipmentState.WITHDRAWN });
     onClose();
   };
 

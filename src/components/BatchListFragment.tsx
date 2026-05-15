@@ -4,8 +4,6 @@
  */
 
 import React, { useState } from 'react';
-import { db } from '../db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { 
   Plus, 
   MoreVertical, 
@@ -21,10 +19,11 @@ import {
 } from 'lucide-react';
 import { cn, formatWeight, formatDate, copyToClipboard, isWeightExceeded } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { useBatches, useVarieties, useSendingRecords, useBatch, dataService } from '../lib/dataService';
 
 export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
-  const batches = useLiveQuery(() => db.tab_batch.orderBy('bdate').reverse().toArray());
-  const varieties = useLiveQuery(() => db.tab_variaty.toArray());
+  const batches = useBatches();
+  const varieties = useVarieties();
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [historyModal, setHistoryModal] = useState<number | null>(null);
   const [modifyModal, setModifyModal] = useState<number | null>(null);
@@ -163,13 +162,13 @@ function MenuButton({ icon, label, onClick, className }: { icon: React.ReactNode
 // --- Modal Components ---
 
 function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
-  const batch = useLiveQuery(() => bid ? db.tab_batch.get(bid) : undefined, [bid]);
-  const varieties = useLiveQuery(() => db.tab_variaty.toArray());
-  const records = useLiveQuery(() => db.tab_sending_record.where('sstate').equals(3).toArray());
+  const batch = useBatch(bid);
+  const varieties = useVarieties();
+  const records = useSendingRecords(false);
 
   if (!bid || !batch) return null;
 
-  const history = records?.filter(r => r.sainfo.includes(`${bid}/`)).map(r => {
+  const history = records?.filter(r => r.sstate === 3 && r.sainfo.includes(`${bid}/`)).map(r => {
     const weight = parseFloat(r.sainfo.split(',').find(s => s.startsWith(`${bid}/`))?.split('/')[1] || '0');
     return { ...r, weight };
   });
@@ -203,7 +202,7 @@ function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => voi
 }
 
 function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
-  const batch = useLiveQuery(() => bid ? db.tab_batch.get(bid) : undefined, [bid]);
+  const batch = useBatch(bid);
   const [weight, setWeight] = useState('');
   const [status, setStatus] = useState<number>(0);
   const [memo, setMemo] = useState('');
@@ -221,7 +220,7 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
   const handleConfirm = async () => {
     const w = parseFloat(weight);
     if (isNaN(w) || isWeightExceeded(w, batch.bowei)) return;
-    await db.tab_batch.update(bid, { 
+    await dataService.updateBatch(bid, { 
       bcwei: w,
       bstatus: status,
       bmemo: memo
@@ -302,7 +301,7 @@ function DeleteModal({ bid, onClose }: { bid: number | null, onClose: () => void
   if (!bid) return null;
 
   const handleConfirm = async () => {
-    await db.tab_batch.delete(bid);
+    await dataService.deleteBatch(bid);
     onClose();
   };
 

@@ -4,17 +4,16 @@
  */
 
 import { useState, useMemo } from 'react';
-import { db } from '../db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, CheckCircle2, Package, Info, AlertCircle, Calendar, Truck } from 'lucide-react';
 import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatWeight, isWeightExceeded } from '../lib/utils';
+import { useSendingRecord, useVarieties, useBatches, dataService } from '../lib/dataService';
 
 export default function AllocationPage({ shipmentId, onBack, onComplete }: { shipmentId: number, onBack: () => void, onComplete: () => void }) {
-  const shipment = useLiveQuery(() => db.tab_sending_record.get(shipmentId), [shipmentId]);
-  const varieties = useLiveQuery(() => db.tab_variaty.toArray());
-  const allBatches = useLiveQuery(() => db.tab_batch.where('bstatus').equals(1).toArray());
+  const shipment = useSendingRecord(shipmentId);
+  const varieties = useVarieties();
+  const allBatches = useBatches();
   
   const [allocations, setAllocations] = useState<Record<number, number>>({}); // bid -> weight
   const [activeBatchId, setActiveBatchId] = useState<number | null>(null);
@@ -30,7 +29,7 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
 
   const batches = useMemo(() => {
     if (!allBatches) return [];
-    return allBatches.filter(b => b.bcwei > 0);
+    return allBatches.filter(b => b.bstatus === 1 && b.bcwei > 0);
   }, [allBatches]);
 
   const varietyProgress = useMemo(() => {
@@ -66,7 +65,7 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
       .map(([bid, weight]) => `${bid}/${weight}`)
       .join(',');
     
-    await db.tab_sending_record.update(shipmentId, { 
+    await dataService.updateSendingRecord(shipmentId, { 
       sainfo, 
       sstate: ShipmentState.ALLOCATED 
     });
