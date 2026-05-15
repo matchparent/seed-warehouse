@@ -34,9 +34,9 @@ class DataService {
       };
 
       if (this.mode === 'dexie') {
-        await db.tab_record.add(logEntry);
+        await db.tab_op_record.add(logEntry);
       } else {
-        await fetch('/api/tab_record', {
+        await fetch('/api/tab_op_record', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(logEntry)

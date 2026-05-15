@@ -12,7 +12,7 @@ export class CottonSeedDB extends Dexie {
   tab_batch!: Table<Batch, number>;
   tab_sending_record!: Table<SendingRecord, number>;
   tab_user!: Table<{ uid?: number, spellname: string, key: string }, number>;
-  tab_record!: Table<{ rid?: number, spellname: string, desc: string, optime: string }, number>;
+  tab_op_record!: Table<{ orid?: number, spellname: string, desc: string, optime: string }, number>;
 
   constructor() {
     super('CottonSeedDB');
@@ -22,7 +22,7 @@ export class CottonSeedDB extends Dexie {
       tab_batch: '++bid, bname, bvid, bstatus, bdate',
       tab_sending_record: '++sid, sstate, sdate, splate, sdest',
       tab_user: '++uid, spellname, key',
-      tab_record: '++rid, spellname, optime'
+      tab_op_record: '++orid, spellname, optime'
     });
   }
 }

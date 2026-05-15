@@ -36,21 +36,37 @@ export default function OtherFragment() {
     const destinations = await dataService.getDestinations();
     const batches = await dataService.getBatches(false);
     const records = await dataService.getSendingRecords(false);
-    // ... rest of exportSQL
+    
+    // Fetch users and logs
+    let users: any[] = [];
+    let logs: any[] = [];
+    if (dataService.getMode() === 'dexie') {
+      users = await db.tab_user.toArray();
+      logs = await db.tab_op_record.toArray();
+    } else {
+      const uRes = await fetch('/api/tab_user');
+      users = await uRes.json();
+      const lRes = await fetch('/api/tab_op_record');
+      logs = await lRes.json();
+    }
 
     let sql = `-- Cotton Seed Warehouse Export\n-- Date: ${new Date().toLocaleString()}\n\n`;
 
     // Schema
-    sql += `CREATE TABLE tab_variaty (vid INTEGER PRIMARY KEY, vname TEXT);\n`;
-    sql += `CREATE TABLE tab_destination (did INTEGER PRIMARY KEY, dname TEXT);\n`;
-    sql += `CREATE TABLE tab_batch (bid INTEGER PRIMARY KEY, bname TEXT, bvid INTEGER, bdate TEXT, bowei DECIMAL(10,3), bcwei DECIMAL(10,3), bstatus INTEGER, bcli TEXT, bmemo TEXT);\n`;
-    sql += `CREATE TABLE tab_sending_record (sid INTEGER PRIMARY KEY AUTOINCREMENT, sstate INTEGER, splate TEXT, spinfo TEXT, sainfo TEXT, sdate TEXT, sftime TEXT, sdrpn TEXT, sdest INTEGER, smemo TEXT);\n\n`;
+    sql += `CREATE TABLE tab_variaty (vid INTEGER PRIMARY KEY AUTO_INCREMENT, vname TEXT);\n`;
+    sql += `CREATE TABLE tab_destination (did INTEGER PRIMARY KEY AUTO_INCREMENT, dname TEXT);\n`;
+    sql += `CREATE TABLE tab_batch (bid INTEGER PRIMARY KEY AUTO_INCREMENT, bname TEXT, bvid INTEGER, bdate TEXT, bowei DECIMAL(10,3), bcwei DECIMAL(10,3), bstatus INTEGER, bcli TEXT, bmemo TEXT);\n`;
+    sql += `CREATE TABLE tab_sending_record (sid INTEGER PRIMARY KEY AUTO_INCREMENT, sstate INTEGER, splate TEXT, spinfo TEXT, sainfo TEXT, sdate TEXT, sftime TEXT, sdrpn TEXT, sdest INTEGER, smemo TEXT);\n`;
+    sql += `CREATE TABLE tab_user (uid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`key\` TEXT);\n`;
+    sql += `CREATE TABLE tab_op_record (orid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`desc\` TEXT, optime TEXT);\n\n`;
 
     // Data
     varieties.forEach(v => sql += `INSERT INTO tab_variaty VALUES (${v.vid}, '${v.vname}');\n`);
     destinations.forEach(d => sql += `INSERT INTO tab_destination VALUES (${d.did}, '${d.dname}');\n`);
     batches.forEach(b => sql += `INSERT INTO tab_batch VALUES (${b.bid}, '${b.bname}', ${b.bvid}, '${b.bdate}', ${b.bowei}, ${b.bcwei}, ${b.bstatus}, '${b.bcli}', '${b.bmemo}');\n`);
     records.forEach(r => sql += `INSERT INTO tab_sending_record VALUES (${r.sid}, ${r.sstate}, '${r.splate}', '${r.spinfo}', '${r.sainfo}', '${r.sdate}', '${r.sftime || ''}', '${r.sdrpn}', ${r.sdest}, '${r.smemo}');\n`);
+    users.forEach(u => sql += `INSERT INTO tab_user VALUES (${u.uid}, '${u.spellname}', '${u.key}');\n`);
+    logs.forEach(l => sql += `INSERT INTO tab_op_record VALUES (${l.orid}, '${l.spellname}', '${l.desc.replace(/'/g, "''")}', '${l.optime}');\n`);
 
     const blob = new Blob([sql], { type: 'text/sql' });
     const url = URL.createObjectURL(blob);

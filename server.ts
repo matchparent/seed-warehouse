@@ -78,10 +78,10 @@ async function startServer() {
         });
       }
 
-      const hasRecordLog = await db.schema.hasTable('tab_record');
+      const hasRecordLog = await db.schema.hasTable('tab_op_record');
       if (!hasRecordLog) {
-        await db.schema.createTable('tab_record', (table) => {
-          table.increments('rid').primary();
+        await db.schema.createTable('tab_op_record', (table) => {
+          table.increments('orid').primary();
           table.string('spellname').notNullable();
           table.text('desc').notNullable();
           table.string('optime').notNullable();
@@ -169,7 +169,7 @@ async function startServer() {
   setupTableRoutes('tab_destination', 'did');
   setupTableRoutes('tab_batch', 'bid');
   setupTableRoutes('tab_sending_record', 'sid');
-  setupTableRoutes('tab_record', 'rid');
+  setupTableRoutes('tab_op_record', 'orid');
 
   app.post("/api/auth/login", async (req, res) => {
     const { spellname, key } = req.body;
