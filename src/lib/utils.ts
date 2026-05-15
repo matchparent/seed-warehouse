@@ -5,24 +5,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatWeight(weight: number | string | undefined | null): string {
+export function formatWeight(weight: any): string {
   try {
     const n = Number(weight);
-    const val = isNaN(n) || !isFinite(n) ? 0 : n;
-    return Number(val).toFixed(3);
+    if (isNaN(n) || !isFinite(n)) return "0.000";
+    return n.toFixed(3);
   } catch (e) {
-    console.error('formatWeight error:', e);
+    console.warn('formatWeight received invalid input:', weight, e);
     return "0.000";
   }
 }
 
-export function safeToFixed(value: number | string | undefined | null, decimals: number = 3): string {
+export function safeToFixed(value: any, decimals: number = 3): string {
   try {
     const n = Number(value);
-    const val = isNaN(n) || !isFinite(n) ? 0 : n;
-    return Number(val).toFixed(decimals);
+    if (isNaN(n) || !isFinite(n)) {
+      return (0).toFixed(decimals);
+    }
+    return n.toFixed(decimals);
   } catch (e) {
-    console.error('safeToFixed error:', e);
+    console.warn('safeToFixed received invalid input:', value, e);
     return "0";
   }
 }
