@@ -64,7 +64,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || currentView !== 'main') return;
+    if (!isLoggedIn) return;
 
     const checkAuth = async () => {
       const userStr = localStorage.getItem('auth_user');
@@ -75,6 +75,13 @@ export default function App() {
       
       try {
         const user = JSON.parse(userStr);
+        // Only verify if we have a key, otherwise we might have stale/incomplete data
+        if (!user.spellname || !user.key) {
+          localStorage.removeItem('auth_user');
+          setIsLoggedIn(false);
+          return;
+        }
+
         const isValid = await dataService.verifyUser(user.spellname, user.key);
         if (!isValid) {
           localStorage.removeItem('auth_user');

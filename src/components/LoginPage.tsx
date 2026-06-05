@@ -33,7 +33,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       if (isValid) {
         localStorage.setItem('auth_user', JSON.stringify({
           name: data.name,
-          spellname: data.spellname
+          spellname: data.spellname,
+          key: data.key
         }));
         onLoginSuccess();
       } else {
