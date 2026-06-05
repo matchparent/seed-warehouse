@@ -3,12 +3,14 @@ import { Upload, FileJson, ShieldCheck, AlertCircle, Loader2 } from 'lucide-reac
 import { cn } from '../lib/utils';
 import { dataService } from '../lib/dataService';
 import { motion, AnimatePresence } from 'motion/react';
+import { useI18n } from '../lib/i18n';
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
 }
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -22,7 +24,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       
       // 1. Format validation
       if (data.type !== 'HT-Login' || !data.spellname || !data.key) {
-        throw new Error('无效的授权文件格式');
+        throw new Error(t('login.error.format'));
       }
 
       // 2. Database verification
@@ -35,10 +37,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         }));
         onLoginSuccess();
       } else {
-        throw new Error('授权信息匹配失败，请使用有效的授权文件');
+        throw new Error(t('login.error.match'));
       }
     } catch (err: any) {
-      setError(err.message || '文件读取失败');
+      setError(err.message || t('login.error.read'));
     } finally {
       setLoading(false);
     }
@@ -93,8 +95,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           </div>
           
           <div>
-            <h1 className="text-2xl font-black text-slate-800">系统授权登录</h1>
-            <p className="text-slate-400 text-sm mt-2">请上传您的 JSON 授权文件以进入系统</p>
+            <h1 className="text-2xl font-black text-slate-800">系统授权登录 / Tizimga kirish</h1>
+            <p className="text-slate-400 text-sm mt-2 font-medium">请上传您的 JSON 授权文件以进入系统 / JSON ruxsatnoma faylini yuklang</p>
           </div>
 
           <div 
@@ -123,8 +125,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               )}>
                 {loading ? <Loader2 className="animate-spin" size={24} /> : <Upload size={24} />}
               </div>
-              <div className="text-sm font-bold text-slate-600">点击或将文件拖拽至此</div>
-              <div className="text-[10px] text-slate-400">仅支持 .json 授权格式</div>
+              <div className="text-sm font-bold text-slate-600">{t('login.drag_hint')}</div>
+              <div className="text-[10px] text-slate-400">.json</div>
             </div>
           </div>
 
@@ -141,11 +143,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               </motion.div>
             )}
           </AnimatePresence>
-
-          <div className="pt-4 flex items-center justify-center gap-2 text-[10px] text-slate-300">
-            <ShieldCheck size={12} />
-            <span>Cotton Seed Management System v1.0</span>
-          </div>
         </div>
       </motion.div>
     </div>

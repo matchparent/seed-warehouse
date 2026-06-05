@@ -101,6 +101,28 @@ async function startServer() {
           key: 'U2FsdGVkX18mX9TVixXl9qnwMi9z2Mc6C1oaKzLc8Ow='
         });
       }
+
+      const variatyCount = await db('tab_variaty').count('vid as count').first();
+      if ((variatyCount as any).count === 0) {
+        await db('tab_variaty').insert([
+          { vid: 1, vname: '新陆中73号' },
+          { vid: 2, vname: 'T115' },
+          { vid: 3, vname: '鸿泰6636' },
+          { vid: 4, vname: '草甘膦' }
+        ]);
+      }
+      const destinationCount = await db('tab_destination').count('did as count').first();
+      if ((destinationCount as any).count === 0) {
+        const uzbekStates = [
+          '塔什干/Toshkent', '撒马尔罕/Samarqand', '布哈拉/Buxoro', '安集延/Andijon',
+          '费尔干纳/Farg\'ona', '纳曼干/Namangan', '吉扎克/Jizzax', '卡什卡达里亚/Qashqadaryo',
+          '苏尔汉河/Surxondaryo', '锡尔河/Sirdaryo', '纳沃伊/Navoiy', '花拉子模/Xorazm',
+          '卡拉卡尔帕克斯坦/Qoraqalpog\'iston'
+        ];
+        await db('tab_destination').insert(
+          uzbekStates.map((name, i) => ({ did: i + 1, dname: name }))
+        );
+      }
       console.log('MySQL schemas checked/initialized.');
     } catch (err) {
       console.error('MySQL initialization failed. Database might not be accessible or configuration is wrong.');

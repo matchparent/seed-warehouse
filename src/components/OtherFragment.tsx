@@ -4,34 +4,22 @@
  */
 
 import { db } from '../db';
-import { Database, FileSpreadsheet, Download, ShieldCheck, Server, Globe } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ShipmentState } from '../types';
-import { dataService, DBMode } from '../lib/dataService';
-import React, { useState, useEffect } from 'react';
+import { dataService } from '../lib/dataService';
+import { useI18n, Language } from '../lib/i18n';
+import { Database, FileSpreadsheet, Download, ShieldCheck, Languages, AlertCircle, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
+import React, { useState } from 'react';
 
 export default function OtherFragment() {
-  const dbMode = dataService.getMode();
-  const [mysqlStatus, setMysqlStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
-
-  useEffect(() => {
-    if (dbMode === 'mysql') {
-      checkMysql();
-    }
-  }, [dbMode]);
-
-  const checkMysql = async () => {
-    try {
-      const res = await fetch('/api/db/status');
-      const data = await res.json();
-      setMysqlStatus(data.status === 'connected' ? 'connected' : 'disconnected');
-    } catch {
-      setMysqlStatus('disconnected');
-    }
-  };
+  const { t, lang, setLang } = useI18n();
+  const [showSQLConfirm, setShowSQLConfirm] = useState(false);
+  const [showExcelConfirm, setShowExcelConfirm] = useState(false);
 
   const exportSQL = async () => {
+    setShowSQLConfirm(false);
     const varieties = await dataService.getVarieties();
     const destinations = await dataService.getDestinations();
     const batches = await dataService.getBatches(false);
@@ -77,6 +65,7 @@ export default function OtherFragment() {
   };
 
   const exportExcel = async () => {
+    setShowExcelConfirm(false);
     const allRecords = await dataService.getSendingRecords(false);
     const records = allRecords.filter(r => r.sstate === ShipmentState.COMPLETED);
     
@@ -85,7 +74,6 @@ export default function OtherFragment() {
     const batches = await dataService.getBatches(false);
 
     const rows: any[] = [];
-    // ... rest of exportExcel logic is same
     records.forEach(r => {
       const destName = destinations.find(d => d.did === r.sdest)?.dname || '未知';
 
@@ -116,103 +104,139 @@ export default function OtherFragment() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Database Status */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <Server size={16} className="text-emerald-600" />
-          <h3 className="text-sm font-bold text-slate-700">当前存储模式</h3>
-        </div>
-        
-        <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
-          <div className={cn(
-            "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-            dbMode === 'mysql' ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600"
-          )}>
-            {dbMode === 'mysql' ? <Globe size={20} /> : <ShieldCheck size={20} />}
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-bold text-slate-700">
-              {dbMode === 'mysql' ? "远程数据库 (MySQL)" : "浏览器本地数据库 (Dexie)"}
-            </div>
-            <div className="text-[10px] text-slate-400">
-              {dbMode === 'mysql' ? "系统已根据环境变量自动启用 MySQL 存储模式" : "未检测到远程数据库配置，当前使用本地存储模式"}
-            </div>
-          </div>
-        </div>
-
-        {dbMode === 'mysql' && (
-          <div className={cn(
-            "mt-2 p-2 rounded-lg text-[10px] flex items-center justify-between",
-            mysqlStatus === 'connected' ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
-          )}>
-            <div className="flex items-center gap-1">
-              <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", mysqlStatus === 'connected' ? "bg-emerald-500" : "bg-red-500")} />
-              {mysqlStatus === 'connected' ? "MySQL 服务已连接" : "MySQL 服务连接异常，请检查后端配置"}
-            </div>
-            <button onClick={checkMysql} className="underline">立即重试</button>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center space-y-2">
-        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-          <ShieldCheck size={32} />
-        </div>
-        <h3 className="font-bold text-slate-800">数据安全与导出</h3>
-        <p className="text-xs text-slate-400 px-4">
-          {dbMode === 'mysql' 
-            ? "当前数据存储在 MySQL 远程服务器中，由后端系统统一管理。" 
-            : "当前数据由于未检测到配置，存储在您的浏览器本地，建议定期导出备份。"}
-        </p>
-      </div>
-
-      <div className="grid gap-3 pt-2">
-        <button 
-          onClick={() => {
-            localStorage.removeItem('auth_user');
-            window.location.reload();
-          }}
-          className="w-full py-4 bg-white border border-slate-100 text-red-500 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-2"
-        >
-          <ShieldCheck size={18} />
-          退出当前授权
-        </button>
-      </div>
-
+    <div className="space-y-6">
       <div className="grid gap-3">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+              <Languages size={20} />
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-bold text-slate-700">{t('other.language')}</div>
+              <div className="text-[10px] text-slate-400">Tilni tanlang / Select Language</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {(['zh', 'uz', 'en'] as Language[]).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                className={cn(
+                  "py-2 rounded-xl text-xs font-bold transition-all border",
+                  lang === l 
+                    ? "bg-slate-800 text-white border-slate-800" 
+                    : "bg-slate-50 text-slate-400 border-slate-100 hover:bg-slate-100"
+                )}
+              >
+                {l === 'zh' ? '中文' : l === 'uz' ? 'O\'zbek' : 'English'}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <button 
-          onClick={exportSQL}
+          onClick={() => setShowSQLConfirm(true)}
           className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:bg-slate-50 transition-colors text-left"
         >
           <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
             <Database size={20} />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-bold text-slate-700">数据库信息导出</div>
-            <div className="text-[10px] text-slate-400">生成 .sql 文件，包含所有表结构与数据</div>
+            <div className="text-sm font-bold text-slate-700">{t('other.export_sql')}</div>
+            <div className="text-[10px] text-slate-400">{t('other.export_sql_desc')}</div>
           </div>
           <Download size={18} className="text-slate-300" />
         </button>
 
         <button 
-          onClick={exportExcel}
+          onClick={() => setShowExcelConfirm(true)}
           className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:bg-slate-50 transition-colors text-left"
         >
           <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shrink-0">
             <FileSpreadsheet size={20} />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-bold text-slate-700">已完成出货信息 Excel 导出</div>
-            <div className="text-[10px] text-slate-400">筛选已完成记录，按批次拆分行导出</div>
+            <div className="text-sm font-bold text-slate-700">{t('other.export_excel')}</div>
+            <div className="text-[10px] text-slate-400">{t('other.export_excel_desc')}</div>
           </div>
           <Download size={18} className="text-slate-300" />
         </button>
       </div>
 
-      <div className="mt-8 text-center">
-        <p className="text-[10px] text-slate-300">Cotton Seed Warehouse Management System © 2026</p>
+      <div className="grid gap-3 pt-4 border-t border-slate-50">
+        <button 
+          onClick={() => {
+            localStorage.removeItem('auth_user');
+            window.location.reload();
+          }}
+          className="w-full py-4 bg-white border border-slate-100 text-red-500 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-2 hover:bg-red-50 transition-colors"
+        >
+          <ShieldCheck size={18} />
+          {t('other.logout')}
+        </button>
       </div>
+
+      <AnimatePresence>
+        {showSQLConfirm && (
+          <Modal title={t('other.export_sql')} onClose={() => setShowSQLConfirm(false)}>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-amber-600 bg-amber-50 p-4 rounded-xl">
+                <AlertCircle size={24} className="shrink-0" />
+                <p className="text-xs font-bold leading-relaxed">{t('confirm.export_sql')}</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setShowSQLConfirm(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">{t('action.no')}</button>
+                <button onClick={exportSQL} className="flex-1 py-4 bg-blue-500 text-white rounded-2xl font-bold shadow-lg shadow-blue-100">{t('action.ok')}</button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {showExcelConfirm && (
+          <Modal title={t('other.export_excel')} onClose={() => setShowExcelConfirm(false)}>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-emerald-600 bg-emerald-50 p-4 rounded-xl">
+                <AlertCircle size={24} className="shrink-0" />
+                <p className="text-xs font-bold leading-relaxed">{t('confirm.export_excel')}</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setShowExcelConfirm(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">{t('action.no')}</button>
+                <button onClick={exportExcel} className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100">{t('action.ok')}</button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function Modal({ title, children, onClose }: { title: string, children: React.ReactNode, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+      />
+      <motion.div 
+        initial={{ opacity: 0, y: 100 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        exit={{ opacity: 0, y: 100 }}
+        className="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl relative z-10 overflow-hidden"
+      >
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <Plus className="rotate-45" size={24} />
+          </button>
+        </div>
+        <div className="p-6">
+          {children}
+        </div>
+      </motion.div>
     </div>
   );
 }

@@ -7,8 +7,10 @@ import React, { useState } from 'react';
 import { ArrowLeft, Save, Calendar, Truck, Tag, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useVarieties, dataService } from '../lib/dataService';
+import { useI18n } from '../lib/i18n';
 
 export default function AddBatchPage({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n();
   const varieties = useVarieties();
   const [formData, setFormData] = useState({
     bname: '',
@@ -43,35 +45,37 @@ export default function AddBatchPage({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="p-2 hover:bg-slate-50 rounded-full text-slate-400">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-bold text-slate-800">添加新批次</h1>
+        <h1 className="text-lg font-bold text-slate-800">
+          {t('page.add_batch')}
+        </h1>
       </header>
 
       <main className="flex-1 overflow-y-auto p-6 space-y-6">
         <div className="space-y-4">
-          <InputGroup label="批次名称" icon={<Tag size={18} />}>
+          <InputGroup label={t('form.batch_name')} icon={<Tag size={18} />}>
             <input 
               type="text" 
               value={formData.bname}
               onChange={e => setFormData({...formData, bname: e.target.value})}
-              placeholder="例如: 2026-A01"
+              placeholder="2026-A01"
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
             />
           </InputGroup>
 
-          <InputGroup label="对应品种" icon={<PackageIcon size={18} />}>
+          <InputGroup label={t('form.variety')} icon={<PackageIcon size={18} />}>
             <select 
               value={formData.bvid}
               onChange={e => setFormData({...formData, bvid: e.target.value})}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
             >
-              <option value="">选择品种</option>
+              <option value="">{t('form.select_variety')}</option>
               {varieties?.map(v => (
                 <option key={v.vid} value={v.vid}>{v.vname}</option>
               ))}
             </select>
           </InputGroup>
 
-          <InputGroup label="卸货日期" icon={<Calendar size={18} />}>
+          <InputGroup label={t('form.date')} icon={<Calendar size={18} />}>
             <input 
               type="date" 
               value={formData.bdate}
@@ -80,36 +84,36 @@ export default function AddBatchPage({ onBack }: { onBack: () => void }) {
             />
           </InputGroup>
 
-          <InputGroup label="批次总重 (吨)" icon={<ScaleIcon size={18} />}>
+          <InputGroup label={t('form.total_weight_t')} icon={<ScaleIcon size={18} />}>
             <input 
               type="number" 
               step="0.001"
               value={formData.bowei}
               onChange={e => setFormData({...formData, bowei: e.target.value})}
               placeholder="0.000"
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold"
             />
           </InputGroup>
 
-          <InputGroup label="运送卡车车牌" icon={<Truck size={18} />}>
+          <InputGroup label={t('form.plate')} icon={<Truck size={18} />}>
             <input 
               type="text" 
               maxLength={30}
               value={formData.bcli}
               onChange={e => setFormData({...formData, bcli: e.target.value})}
-              placeholder="输入车牌号"
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+              placeholder={t('form.placeholder.plate')}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold"
             />
           </InputGroup>
 
-          <InputGroup label="备注 (可选)" icon={<FileText size={18} />}>
+          <InputGroup label={t('batch.memo')} icon={<FileText size={18} />}>
             <textarea 
               maxLength={400}
               rows={3}
               value={formData.bmemo}
               onChange={e => setFormData({...formData, bmemo: e.target.value})}
-              placeholder="输入备注信息..."
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+              placeholder={t('form.placeholder.memo')}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
             />
             <div className="text-[10px] text-right text-slate-400 mt-1">{formData.bmemo.length}/400</div>
           </InputGroup>
@@ -122,7 +126,7 @@ export default function AddBatchPage({ onBack }: { onBack: () => void }) {
           disabled={!isValid}
           className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          <Save size={20} /> 确认添加
+          <Save size={20} /> {t('action.add')}
         </button>
       </footer>
     </div>

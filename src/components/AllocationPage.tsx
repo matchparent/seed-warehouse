@@ -9,8 +9,10 @@ import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatWeight, isWeightExceeded } from '../lib/utils';
 import { useSendingRecord, useVarieties, useBatches, dataService } from '../lib/dataService';
+import { useI18n } from '../lib/i18n';
 
 export default function AllocationPage({ shipmentId, onBack, onComplete }: { shipmentId: number, onBack: () => void, onComplete: () => void }) {
+  const { t } = useI18n();
   const shipment = useSendingRecord(shipmentId);
   const varieties = useVarieties();
   const allBatches = useBatches();
@@ -79,13 +81,15 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
         <button onClick={onBack} className="p-2 hover:bg-slate-50 rounded-full text-slate-400">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-bold text-slate-800">货物配置</h1>
+        <h1 className="text-lg font-bold text-slate-800">
+          {t('page.allocation')}
+        </h1>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Progress Section */}
         <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">分配进度</h3>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('stats.overview')}</h3>
           <div className="space-y-3">
             {varietyProgress.map((p, i) => (
               <div key={i} className="space-y-1">
@@ -109,7 +113,7 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
 
         {/* Batch List Section */}
         <section className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">可用批次 (点击配置)</h3>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">{t('form.batches_available')}</h3>
           <div className="grid gap-2">
             {batches.map(batch => {
               const allocated = allocations[batch.bid] || 0;
@@ -140,8 +144,8 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[10px] text-slate-400">剩余: {formatWeight(batch.bcwei)}t</div>
-                      {allocated > 0 && <div className="text-xs font-bold text-emerald-600">已选: {formatWeight(allocated)}t</div>}
+                      <div className="text-[10px] text-slate-400">{t('stats.remaining')}: {formatWeight(batch.bcwei)}t</div>
+                      {allocated > 0 && <div className="text-xs font-bold text-emerald-600">{t('shipment.status.allocated')}: {formatWeight(allocated)}t</div>}
                     </div>
                   </div>
                 </button>
@@ -154,14 +158,14 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
       <footer className="p-6 bg-white border-t border-slate-100 space-y-4">
         <div className="bg-slate-50 p-3 rounded-xl flex items-center gap-3">
           <Info size={18} className="text-blue-500" />
-          <p className="text-[10px] text-slate-500">只有当所有品种的已配置重量与计划重量完全吻合时，才可完成分配。</p>
+          <p className="text-[10px] text-slate-500 leading-relaxed font-medium">{t('confirm.shipment_allocation_desc')}</p>
         </div>
         <button 
           onClick={handleFinish}
           disabled={!isAllMatched}
           className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          <CheckCircle2 size={20} /> 完成分配
+          <CheckCircle2 size={20} /> {t('action.confirm')}
         </button>
       </footer>
 
@@ -178,13 +182,13 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
               initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
               className="bg-white w-full max-w-xs rounded-3xl shadow-2xl relative z-10 p-6 space-y-4"
             >
-              <h3 className="font-bold text-slate-800">配置扣除吨数</h3>
+              <h3 className="font-bold text-slate-800">{t('page.allocation')}</h3>
               <div>
                 <div className="text-[10px] text-slate-400 mb-1">
-                  批次: {batches.find(b => b.bid === activeBatchId)?.bname}
+                  {t('form.batch_name')}: {batches.find(b => b.bid === activeBatchId)?.bname}
                 </div>
                 <div className="text-xs text-slate-500 mb-2">
-                  当前批次剩余: <span className="font-bold text-slate-700">{formatWeight(batches.find(b => b.bid === activeBatchId)?.bcwei || 0)}t</span>
+                  {t('stats.remaining')}: <span className="font-bold text-slate-700">{formatWeight(batches.find(b => b.bid === activeBatchId)?.bcwei || 0)}t</span>
                 </div>
                 <input 
                   type="number" 
@@ -192,24 +196,24 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
                   autoFocus
                   value={tempWeight}
                   onChange={e => setTempWeight(e.target.value)}
-                  placeholder="输入扣除吨数"
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder={t('form.total_weight_t')}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
                 />
                 {isWeightExceeded(parseFloat(tempWeight), batches.find(b => b.bid === activeBatchId)?.bcwei || 0) && (
                   <div className="flex items-center gap-1 text-red-500 mt-2">
                     <AlertCircle size={12} />
-                    <span className="text-[10px] font-bold">超出批次剩余重量！</span>
+                    <span className="text-[10px] font-bold">{t('confirm.exceed_weight')}</span>
                   </div>
                 )}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setActiveBatchId(null)} className="flex-1 py-2 text-slate-400 font-bold">取消</button>
+                <button onClick={() => setActiveBatchId(null)} className="flex-1 py-2 text-slate-400 font-bold">{t('action.no')}</button>
                 <button 
                   onClick={handleSetAllocation}
                   disabled={!tempWeight || isWeightExceeded(parseFloat(tempWeight), batches.find(b => b.bid === activeBatchId)?.bcwei || 0)}
                   className="flex-1 py-2 bg-emerald-500 text-white rounded-xl font-bold disabled:opacity-50"
                 >
-                  确认
+                  {t('action.confirm')}
                 </button>
               </div>
             </motion.div>

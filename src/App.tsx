@@ -36,6 +36,7 @@ import AllocationPage from './components/AllocationPage';
 import InspectionPage from './components/InspectionPage';
 import LoginPage from './components/LoginPage';
 import { dataService } from './lib/dataService';
+import { useI18n } from './lib/i18n';
 
 // --- Fragments ---
 import BatchListFragment from './components/BatchListFragment';
@@ -46,6 +47,7 @@ import OtherFragment from './components/OtherFragment';
 type View = 'main' | 'add-batch' | 'create-shipment' | 'allocation' | 'inspection';
 
 export default function App() {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState(0);
   const [currentView, setCurrentView] = useState<View>('main');
   const [selectedShipmentId, setSelectedShipmentId] = useState<number | null>(null);
@@ -60,6 +62,32 @@ export default function App() {
     }
     start();
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || currentView !== 'main') return;
+
+    const checkAuth = async () => {
+      const userStr = localStorage.getItem('auth_user');
+      if (!userStr) {
+        setIsLoggedIn(false);
+        return;
+      }
+      
+      try {
+        const user = JSON.parse(userStr);
+        const isValid = await dataService.verifyUser(user.spellname, user.key);
+        if (!isValid) {
+          localStorage.removeItem('auth_user');
+          setIsLoggedIn(false);
+        }
+      } catch (e) {
+        localStorage.removeItem('auth_user');
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkAuth();
+  }, [activeTab, isLoggedIn, currentView]);
 
   if (!isInitialized) {
     return (
@@ -104,15 +132,6 @@ export default function App() {
       default:
         return (
           <div className="flex flex-col h-screen bg-slate-50">
-            <header className="bg-white px-6 py-4 shadow-sm flex justify-between items-center">
-              <h1 className="text-xl font-bold text-emerald-800 tracking-tight">
-                棉种仓储管理 <span className="text-xs font-normal text-slate-400 ml-2">v1.0</span>
-              </h1>
-              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                <Package size={18} />
-              </div>
-            </header>
-
             <main className="flex-1 overflow-y-auto pb-24">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -139,10 +158,10 @@ export default function App() {
             </main>
 
             <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-2 py-2 flex justify-around items-center shadow-lg z-50">
-              <TabButton active={activeTab === 0} onClick={() => setActiveTab(0)} icon={<Package size={20} />} label="批次" />
-              <TabButton active={activeTab === 1} onClick={() => setActiveTab(1)} icon={<Truck size={20} />} label="发货" />
-              <TabButton active={activeTab === 2} onClick={() => setActiveTab(2)} icon={<BarChart3 size={20} />} label="统计" />
-              <TabButton active={activeTab === 3} onClick={() => setActiveTab(3)} icon={<Settings size={20} />} label="其他" />
+              <TabButton active={activeTab === 0} onClick={() => setActiveTab(0)} icon={<Package size={20} />} label={t('nav.batches')} />
+              <TabButton active={activeTab === 1} onClick={() => setActiveTab(1)} icon={<Truck size={20} />} label={t('nav.shipments')} />
+              <TabButton active={activeTab === 2} onClick={() => setActiveTab(2)} icon={<BarChart3 size={20} />} label={t('nav.stats')} />
+              <TabButton active={activeTab === 3} onClick={() => setActiveTab(3)} icon={<Settings size={20} />} label={t('nav.other')} />
             </nav>
           </div>
         );

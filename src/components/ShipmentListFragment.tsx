@@ -22,8 +22,10 @@ import { cn, formatDate, safeToFixed } from '../lib/utils';
 import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSendingRecords, useVarieties, useDestinations, useBatches, useBatch, useSendingRecord, dataService } from '../lib/dataService';
+import { useI18n } from '../lib/i18n';
 
 export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => void, onEdit: (id: number, state: ShipmentState) => void }) {
+  const { t } = useI18n();
   const [filterDate, setFilterDate] = useState<string>('');
   const records = useSendingRecords(true, filterDate);
   const varieties = useVarieties();
@@ -37,11 +39,11 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
 
   const getStateLabel = (state: ShipmentState) => {
     switch (state) {
-      case ShipmentState.NEW: return { label: '新创建', color: 'bg-blue-100 text-blue-600' };
-      case ShipmentState.ALLOCATED: return { label: '已分配', color: 'bg-amber-100 text-amber-600' };
-      case ShipmentState.COMPLETED: return { label: '已完成', color: 'bg-emerald-100 text-emerald-600' };
-      case ShipmentState.WITHDRAWN: return { label: '已撤回', color: 'bg-slate-100 text-slate-600' };
-      default: return { label: '未知', color: 'bg-slate-100 text-slate-600' };
+      case ShipmentState.NEW: return { label: t('shipment.status.new'), color: 'bg-blue-100 text-blue-600' };
+      case ShipmentState.ALLOCATED: return { label: t('shipment.status.allocated'), color: 'bg-amber-100 text-amber-600' };
+      case ShipmentState.COMPLETED: return { label: t('shipment.status.completed'), color: 'bg-emerald-100 text-emerald-600' };
+      case ShipmentState.WITHDRAWN: return { label: t('shipment.status.withdrawn'), color: 'bg-slate-100 text-slate-600' };
+      default: return { label: t('shipment.status.unknown'), color: 'bg-slate-100 text-slate-600' };
     }
   };
 
@@ -59,7 +61,9 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold text-slate-800">发货记录</h2>
+        <h2 className="text-lg font-bold text-slate-800">
+          {t('shipment.records')}
+        </h2>
         <div className="flex gap-2">
           <div className="relative">
             <input 
@@ -143,19 +147,19 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
                         <>
                           <MenuButton 
                             icon={<Edit2 size={14} />} 
-                            label="修改备注/电话" 
+                            label={t('shipment.modify')} 
                             onClick={() => { setModifyModal(record.sid!); setMenuOpen(null); }} 
                           />
                           <MenuButton 
                             icon={<RotateCcw size={14} />} 
-                            label="撤回发货" 
+                            label={t('shipment.withdraw')} 
                             onClick={() => { setWithdrawModal(record.sid!); setMenuOpen(null); }} 
                           />
                         </>
                       ) : (
                         <MenuButton 
                           icon={<Trash2 size={14} />} 
-                          label="删除记录" 
+                          label={t('shipment.delete')} 
                           onClick={() => { setDeleteModal(record.sid!); setMenuOpen(null); }} 
                           className="text-red-500" 
                         />
@@ -172,7 +176,7 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
 
               <div className="grid grid-cols-2 gap-2 text-[11px]">
                 <div className="flex items-center gap-1 text-slate-500">
-                  <Phone size={12} /> {record.sdrpn || '未填写'}
+                  <Phone size={12} /> {record.sdrpn || t('action.cancel')}
                 </div>
                 <div className="flex items-center gap-1 text-slate-500 truncate">
                   <MapPin size={12} /> {destinations?.find(d => d.did === record.sdest)?.dname}
@@ -180,8 +184,8 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
               </div>
 
               <div className="bg-slate-50 p-2 rounded-lg">
-                <div className="text-[10px] text-slate-400 mb-1 font-medium">
-                  {showPlanned ? '计划装载' : '实际装载'}
+                <div className="text-[10px] text-slate-400 mb-1 font-bold uppercase">
+                  {showPlanned ? t('shipment.planned') : t('shipment.actual')}
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
                   {info.map((item, i) => (
@@ -203,8 +207,8 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
           );
         })}
         {records?.length === 0 && (
-          <div className="text-center py-12 text-slate-400 text-sm italic">
-            暂无发货记录
+          <div className="text-center py-12 text-slate-400 text-sm italic font-medium">
+            {t('shipment.no_records')}
           </div>
         )}
       </div>
@@ -229,6 +233,7 @@ function MenuButton({ icon, label, onClick, className }: { icon: React.ReactNode
 }
 
 function ModifyShipmentModal({ sid, onClose }: { sid: number | null, onClose: () => void }) {
+  const { t } = useI18n();
   const record = useSendingRecord(sid);
   const [memo, setMemo] = useState('');
   const [phone, setPhone] = useState('');
@@ -251,33 +256,33 @@ function ModifyShipmentModal({ sid, onClose }: { sid: number | null, onClose: ()
   };
 
   return (
-    <Modal title="修改记录信息" onClose={onClose}>
+    <Modal title={t('shipment.modify')} onClose={onClose}>
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-bold">司机电话</label>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">{t('shipment.driver_tel')}</label>
           <input 
             type="tel" 
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="输入电话..."
+            placeholder={t('form.placeholder.plate')}
             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold"
           />
         </div>
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-bold">发货备注</label>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">{t('shipment.memo')}</label>
           <textarea 
             rows={3}
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
-            placeholder="输入备注信息..."
+            placeholder={t('form.placeholder.memo')}
             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
           />
         </div>
         <button 
           onClick={handleConfirm}
-          className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold shadow-lg"
+          className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold shadow-lg"
         >
-          确认修改
+          {t('action.confirm')}
         </button>
       </div>
     </Modal>
@@ -285,21 +290,22 @@ function ModifyShipmentModal({ sid, onClose }: { sid: number | null, onClose: ()
 }
 
 function DeleteShipmentModal({ sid, onClose }: { sid: number | null, onClose: () => void }) {
+  const { t } = useI18n();
   if (!sid) return null;
   const handleConfirm = async () => {
     await dataService.deleteSendingRecord(sid);
     onClose();
   };
   return (
-    <Modal title="确认删除记录" onClose={onClose}>
+    <Modal title={t('shipment.delete')} onClose={onClose}>
       <div className="space-y-4">
         <div className="flex items-center gap-3 text-red-600 bg-red-50 p-4 rounded-xl">
-          <AlertCircle size={24} />
-          <p className="text-sm font-medium">确定要删除这条发货记录吗？</p>
+          <AlertCircle size={24} className="shrink-0" />
+          <p className="text-xs font-bold leading-relaxed">{t('confirm.delete_shipment')}</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold">取消</button>
-          <button onClick={handleConfirm} className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold">确认删除</button>
+          <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">{t('action.no')}</button>
+          <button onClick={handleConfirm} className="flex-1 py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100">{t('action.ok')}</button>
         </div>
       </div>
     </Modal>
@@ -307,6 +313,7 @@ function DeleteShipmentModal({ sid, onClose }: { sid: number | null, onClose: ()
 }
 
 function WithdrawShipmentModal({ sid, onClose }: { sid: number | null, onClose: () => void }) {
+  const { t } = useI18n();
   const record = useSendingRecord(sid);
   const batches = useBatches();
 
@@ -331,21 +338,21 @@ function WithdrawShipmentModal({ sid, onClose }: { sid: number | null, onClose: 
   };
 
   return (
-    <Modal title="确认撤回发货" onClose={onClose}>
+    <Modal title={t('shipment.withdraw')} onClose={onClose}>
       <div className="space-y-4">
-        <div className="text-sm text-slate-600">撤回后，以下批次的剩余重量将恢复：</div>
+        <div className="text-xs font-bold text-slate-500 uppercase">{t('confirm.withdraw_shipment_desc')}</div>
         <div className="space-y-2">
           {allocations.map(a => (
-            <div key={a.bid} className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
-              <span>{a.name}</span>
-              <span className="font-bold text-emerald-600">{Number(a.current)}t → {safeToFixed(Number(a.current) + Number(a.weight), 3)}t</span>
+            <div key={a.bid} className="flex justify-between text-xs p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span className="font-bold text-slate-700">{a.name}</span>
+              <span className="font-bold text-emerald-600 font-mono">{Number(a.current)}t → {safeToFixed(Number(a.current) + Number(a.weight), 3)}t</span>
             </div>
           ))}
         </div>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold">取消</button>
-          <button onClick={handleConfirm} className="flex-1 py-3 bg-amber-500 text-white rounded-xl font-bold flex items-center justify-center gap-2">
-            <RotateCcw size={16} /> 确认撤回
+        <div className="flex gap-3 pt-2">
+          <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">{t('action.cancel')}</button>
+          <button onClick={handleConfirm} className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-bold shadow-lg shadow-amber-100 flex items-center justify-center gap-2">
+            <RotateCcw size={16} /> {t('action.confirm')}
           </button>
         </div>
       </div>

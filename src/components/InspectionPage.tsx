@@ -9,8 +9,10 @@ import { ShipmentState } from '../types';
 import { formatWeight, formatDate, subWeights } from '../lib/utils';
 import { motion } from 'motion/react';
 import { useSendingRecord, useVarieties, useDestinations, useBatches, dataService } from '../lib/dataService';
+import { useI18n } from '../lib/i18n';
 
 export default function InspectionPage({ shipmentId, onBack, onFinished }: { shipmentId: number, onBack: () => void, onFinished: () => void }) {
+  const { t } = useI18n();
   const shipment = useSendingRecord(shipmentId);
   const varieties = useVarieties();
   const destinations = useDestinations();
@@ -65,41 +67,43 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
         <button onClick={onBack} className="p-2 hover:bg-slate-50 rounded-full text-slate-400">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-bold text-slate-800">发货检查</h1>
+        <h1 className="text-lg font-bold text-slate-800">
+          {t('page.inspection')}
+        </h1>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Info Summary */}
         <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-2 gap-4">
-          <InfoItem icon={<Truck size={14} />} label="车牌号" value={shipment.splate} />
-          <InfoItem icon={<MapPin size={14} />} label="目的地" value={destinations.find(d => d.did === shipment.sdest)?.dname || ''} />
-          <InfoItem icon={<Calendar size={14} />} label="创建日期" value={formatDate(shipment.sdate)} />
+          <InfoItem icon={<Truck size={14} />} label={t('form.plate')} value={shipment.splate} />
+          <InfoItem icon={<MapPin size={14} />} label={t('form.destination')} value={destinations.find(d => d.did === shipment.sdest)?.dname || ''} />
+          <InfoItem icon={<Calendar size={14} />} label={t('form.date')} value={formatDate(shipment.sdate)} />
         </section>
 
         {/* Input Details Section */}
         <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
           <div className="space-y-2">
             <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
-              <Phone size={14} /> 司机电话
+              <Phone size={14} /> {t('shipment.driver_tel')}
             </div>
             <input 
               type="tel" 
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="请输入司机电话 (例如: +998...)"
+              placeholder={t('form.placeholder.plate')}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold"
             />
           </div>
 
           <div className="space-y-2">
             <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
-              <FileText size={14} /> 备注 (可选)
+              <FileText size={14} /> {t('shipment.memo')}
             </div>
             <textarea 
               rows={3}
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              placeholder="输入执行此次发货的备注..."
+              placeholder={t('form.placeholder.memo')}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
             />
           </div>
@@ -107,7 +111,7 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
 
         {/* Weight Change Inspection */}
         <section className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">批次重量变动检查</h3>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">{t('confirm.inspect_weight')}</h3>
           <div className="space-y-2">
             {allocations.map(a => (
               <div key={a.bid} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
@@ -117,21 +121,21 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
                     <div className="text-[10px] text-emerald-600 font-medium">{a.vname}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] text-slate-400 uppercase font-bold">装载吨数</div>
+                    <div className="text-[10px] text-slate-400 uppercase font-bold text-[8px]">{t('shipment.actual')}</div>
                     <div className="text-sm font-bold text-red-500">-{formatWeight(a.deduct)}t</div>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-xl relative overflow-hidden">
                   <div className="flex-1 text-center">
-                    <div className="text-[10px] text-slate-400 mb-1">发货前</div>
+                    <div className="text-[10px] text-slate-400 mb-1">{t('stats.before')}</div>
                     <div className="text-xs font-bold text-slate-600">{formatWeight(a.current)}t</div>
                   </div>
                   <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-300 z-10">
                     <ArrowLeft className="rotate-180" size={16} />
                   </div>
                   <div className="flex-1 text-center">
-                    <div className="text-[10px] text-slate-400 mb-1">发货后</div>
+                    <div className="text-[10px] text-slate-400 mb-1">{t('stats.after')}</div>
                     <div className="text-xs font-bold text-emerald-600">{formatWeight(a.current - a.deduct)}t</div>
                   </div>
                 </div>
@@ -142,8 +146,8 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
 
         <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex gap-3">
           <Info className="text-amber-500 shrink-0" size={20} />
-          <p className="text-xs text-amber-700 leading-relaxed">
-            请仔细核对以上信息。点击“完成发货”后，系统将正式扣除对应批次的库存重量，并记录发货时间。
+          <p className="text-[10px] text-amber-700 leading-relaxed font-medium">
+            {t('confirm.shipment_complete_desc')}
           </p>
         </div>
       </main>
@@ -153,7 +157,7 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
           onClick={handleFinish}
           className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100 flex items-center justify-center gap-2"
         >
-          <CheckCircle2 size={20} /> 完成发货
+          <CheckCircle2 size={20} /> {t('action.confirm')}
         </button>
       </footer>
     </div>

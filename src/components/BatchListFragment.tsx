@@ -20,8 +20,10 @@ import {
 import { cn, formatWeight, formatDate, copyToClipboard, isWeightExceeded, safeToFixed } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBatches, useVarieties, useSendingRecords, useBatch, dataService } from '../lib/dataService';
+import { useI18n } from '../lib/i18n';
 
 export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
+  const { t } = useI18n();
   const batches = useBatches();
   const varieties = useVarieties();
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
@@ -55,7 +57,9 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold text-slate-800">当前库存批次</h2>
+        <h2 className="text-lg font-bold text-slate-800">
+          {t('batch.current_stock')}
+        </h2>
         <button
           onClick={onAdd}
           className="bg-emerald-500 text-white p-2 rounded-full shadow-lg hover:bg-emerald-600 transition-colors"
@@ -75,7 +79,7 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
             />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start">
-                <span className="font-bold text-slate-700 truncate">批次: {batch.bname}</span>
+                <span className="font-bold text-slate-700 truncate">{t('batch.label')}: {batch.bname}</span>
                 <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-mono">
                   ID: {batch.bid}
                 </span>
@@ -83,9 +87,9 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
               <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
                 <span className="font-medium text-emerald-600">{getVarietyName(batch.bvid)}</span>
                 <span className="text-slate-300">|</span>
-                <span>初始: {formatWeight(batch.bowei)}t</span>
+                <span>{t('batch.initial')}: {formatWeight(batch.bowei)}t</span>
                 <span className="text-slate-300">|</span>
-                <span className="font-bold text-slate-700">剩余: {formatWeight(batch.bcwei)}t</span>
+                <span className="font-bold text-slate-700">{t('batch.remaining')}: {formatWeight(batch.bcwei)}t</span>
               </div>
               <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-3">
                 <span className="flex items-center gap-1">
@@ -120,9 +124,9 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
                     className="absolute right-3 top-10 bg-white shadow-xl border border-slate-100 rounded-xl py-1 z-20 min-w-[120px]"
                   >
-                    <MenuButton icon={<History size={14} />} label="发货历史" onClick={() => { setHistoryModal(batch.bid); setMenuOpen(null); }} />
-                    <MenuButton icon={<Edit2 size={14} />} label="修改" onClick={() => { setModifyModal(batch.bid); setMenuOpen(null); }} />
-                    <MenuButton icon={<Trash2 size={14} />} label="删除" onClick={() => { setDeleteConfirm(batch.bid); setMenuOpen(null); }} className="text-red-500" />
+                    <MenuButton icon={<History size={14} />} label={t('batch.history')} onClick={() => { setHistoryModal(batch.bid); setMenuOpen(null); }} />
+                    <MenuButton icon={<Edit2 size={14} />} label={t('batch.modify')} onClick={() => { setModifyModal(batch.bid); setMenuOpen(null); }} />
+                    <MenuButton icon={<Trash2 size={14} />} label={t('batch.delete')} onClick={() => { setDeleteConfirm(batch.bid); setMenuOpen(null); }} className="text-red-500" />
                   </motion.div>
                 </>
               )}
@@ -136,7 +140,7 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
         className="w-full py-3 bg-white border-2 border-dashed border-emerald-200 rounded-xl text-emerald-600 font-medium flex items-center justify-center gap-2 hover:bg-emerald-50 transition-colors mt-4"
       >
         {copied ? <Check size={18} /> : <Copy size={18} />}
-        {copied ? '已复制到剪贴板' : '复制批次剩余重量信息'}
+        {copied ? t('batch.copied') : t('batch.copy_remaining')}
       </button>
 
       {/* Modals */}
@@ -162,6 +166,7 @@ function MenuButton({ icon, label, onClick, className }: { icon: React.ReactNode
 // --- Modal Components ---
 
 function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
+  const { t } = useI18n();
   const batch = useBatch(bid);
   const varieties = useVarieties();
   const records = useSendingRecords(false);
@@ -174,14 +179,14 @@ function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => voi
   });
 
   return (
-    <Modal title="发货历史" onClose={onClose}>
+    <Modal title={t('batch.history')} onClose={onClose}>
       <div className="space-y-4">
         <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-          <div className="text-xs text-emerald-600 font-medium">批次信息</div>
+          <div className="text-[10px] text-emerald-600 font-bold uppercase mb-1">{t('batch.info')}</div>
           <div className="text-sm font-bold text-emerald-900">{batch.bname} ({varieties?.find(v => v.vid === batch.bvid)?.vname})</div>
-          <div className="flex justify-between mt-2 text-xs text-emerald-700">
-            <span>总重: {formatWeight(batch.bowei)}t</span>
-            <span>当前剩余: {formatWeight(batch.bcwei)}t</span>
+          <div className="flex justify-between mt-2 text-[10px] text-emerald-700 font-bold">
+            <span>{t('batch.total_weight')}: {formatWeight(batch.bowei)}t</span>
+            <span>{t('batch.remaining')}: {formatWeight(batch.bcwei)}t</span>
           </div>
         </div>
         
@@ -194,7 +199,7 @@ function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => voi
               </div>
               <div className="text-red-500 font-bold">-{formatWeight(h.weight)}t</div>
             </div>
-          )) : <div className="text-center py-8 text-slate-400 text-xs italic">暂无发货记录</div>}
+          )) : <div className="text-center py-8 text-slate-400 text-xs italic font-medium">{t('batch.no_records')}</div>}
         </div>
       </div>
     </Modal>
@@ -202,6 +207,7 @@ function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => voi
 }
 
 function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
+  const { t } = useI18n();
   const batch = useBatch(bid);
   const [weight, setWeight] = useState('');
   const [status, setStatus] = useState<number>(0);
@@ -229,58 +235,62 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
   };
 
   return (
-    <Modal title="修改批次信息" onClose={onClose}>
+    <Modal title={t('batch.modify')} onClose={onClose}>
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-bold">批次状态</label>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.status')}</label>
           <div className="flex gap-3">
             <button 
               onClick={() => setStatus(1)}
               className={cn(
-                "flex-1 p-3 rounded-xl border-2 flex items-center justify-center gap-2 transition-all",
+                "flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all",
                 status === 1 ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-100 text-slate-400"
               )}
             >
-              <div className="w-3 h-3 rounded-full bg-[#AFC3A8]" />
-              <span className="text-xs font-bold">可发货</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-[#AFC3A8]" />
+                <span className="text-xs font-bold">{t('batch.available')}</span>
+              </div>
             </button>
             <button 
               onClick={() => setStatus(0)}
               className={cn(
-                "flex-1 p-3 rounded-xl border-2 flex items-center justify-center gap-2 transition-all",
+                "flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all",
                 status === 0 ? "border-red-500 bg-red-50 text-red-700" : "border-slate-100 text-slate-400"
               )}
             >
-              <div className="w-3 h-3 rounded-full bg-[#FF2525]" />
-              <span className="text-xs font-bold">不可发货</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-[#FF2525]" />
+                <span className="text-xs font-bold">{t('batch.not_available')}</span>
+              </div>
             </button>
           </div>
         </div>
 
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-bold">剩余吨数</label>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.remaining')} (t)</label>
           <div className="relative">
             <input 
               type="number" 
               step="0.001"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none pr-8 font-mono"
-              placeholder="输入吨数"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none pr-8 font-mono font-bold"
+              placeholder={t('form.total_weight_t')}
             />
             <span className="absolute right-3 top-3 text-[10px] text-slate-400">t</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">最大可调至: {formatWeight(batch.bowei)}t</p>
-          {isWeightExceeded(parseFloat(weight), batch.bowei) && <p className="text-[10px] text-red-500 mt-1">修改数字不可大于批次总重</p>}
+          <p className="text-[10px] text-slate-400 mt-1 font-medium">{t('batch.max_adj')}: {formatWeight(batch.bowei)}t</p>
+          {isWeightExceeded(parseFloat(weight), batch.bowei) && <p className="text-[10px] text-red-500 mt-1 font-bold">{t('batch.weight_exceeded')}</p>}
         </div>
 
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-bold">批次备注</label>
+          <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.memo')}</label>
           <textarea 
             rows={3}
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
-            placeholder="输入备注信息..."
+            placeholder={t('form.placeholder.memo')}
             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
           />
         </div>
@@ -288,9 +298,9 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
         <button 
           onClick={handleConfirm}
           disabled={!weight || isWeightExceeded(parseFloat(weight), batch.bowei)}
-          className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold shadow-lg disabled:opacity-50"
+          className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold shadow-lg disabled:opacity-50"
         >
-          确认修改
+          {t('action.confirm')}
         </button>
       </div>
     </Modal>
@@ -298,6 +308,7 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
 }
 
 function DeleteModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
+  const { t } = useI18n();
   if (!bid) return null;
 
   const handleConfirm = async () => {
@@ -306,15 +317,15 @@ function DeleteModal({ bid, onClose }: { bid: number | null, onClose: () => void
   };
 
   return (
-    <Modal title="确认删除" onClose={onClose}>
+    <Modal title={t('batch.delete')} onClose={onClose}>
       <div className="space-y-4">
         <div className="flex items-center gap-3 text-red-600 bg-red-50 p-4 rounded-xl">
-          <AlertCircle size={24} />
-          <p className="text-sm font-medium">确定要删除这个批次吗？此操作不可撤销。</p>
+          <AlertCircle size={24} className="shrink-0" />
+          <p className="text-xs font-bold leading-relaxed">{t('confirm.delete_batch')}</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold">取消</button>
-          <button onClick={handleConfirm} className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold">确认删除</button>
+          <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">{t('action.no')}</button>
+          <button onClick={handleConfirm} className="flex-1 py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100">{t('action.ok')}</button>
         </div>
       </div>
     </Modal>

@@ -42,7 +42,8 @@ export async function initDB() {
       await db.tab_variaty.bulkPut([
         { vid: 1, vname: '新陆中73号' },
         { vid: 2, vname: 'T115' },
-        { vid: 3, vname: '鸿泰6636' }
+        { vid: 3, vname: '鸿泰6636' },
+        { vid: 4, vname: '草甘膦' }
       ]);
     }
 

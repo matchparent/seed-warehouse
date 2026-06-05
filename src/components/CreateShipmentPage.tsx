@@ -9,8 +9,10 @@ import { ShipmentState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useVarieties, useDestinations, dataService } from '../lib/dataService';
 import { safeToFixed } from '../lib/utils';
+import { useI18n } from '../lib/i18n';
 
 export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () => void, onCreated: (id: number) => void }) {
+  const { t } = useI18n();
   const varieties = useVarieties();
   const destinations = useDestinations();
   
@@ -62,29 +64,31 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
         <button onClick={onBack} className="p-2 hover:bg-slate-50 rounded-full text-slate-400">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-bold text-slate-800">创建出货单</h1>
+        <h1 className="text-lg font-bold text-slate-800">
+          {t('page.create_shipment')}
+        </h1>
       </header>
 
       <main className="flex-1 overflow-y-auto p-6 space-y-6">
         <div className="space-y-4">
-          <InputGroup label="装载卡车车牌" icon={<Truck size={18} />}>
+          <InputGroup label={t('form.plate')} icon={<Truck size={18} />}>
             <input 
               type="text" 
               maxLength={30}
               value={formData.splate}
               onChange={e => setFormData({...formData, splate: e.target.value})}
-              placeholder="输入车牌号"
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+              placeholder={t('form.placeholder.plate')}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold"
             />
           </InputGroup>
 
-          <InputGroup label="目的地" icon={<MapPin size={18} />}>
+          <InputGroup label={t('form.destination')} icon={<MapPin size={18} />}>
             <select 
               value={formData.sdest}
               onChange={e => setFormData({...formData, sdest: e.target.value})}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
             >
-              <option value="">选择目的地</option>
+              <option value="">{t('form.select_destination')}</option>
               {destinations?.map(d => (
                 <option key={d.did} value={d.did}>{d.dname}</option>
               ))}
@@ -94,13 +98,13 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-xs font-bold text-slate-500 flex items-center gap-2 ml-1">
-                <PackageIcon size={18} /> 计划装载品种
+                <PackageIcon size={18} /> {t('shipment.planned')}
               </label>
               <button 
                 onClick={() => setShowItemModal(true)}
                 className="text-xs font-bold text-emerald-600 flex items-center gap-1"
               >
-                <Plus size={14} /> 添加品种
+                <Plus size={14} /> {t('action.add')}
               </button>
             </div>
             <div className="space-y-2">
@@ -118,14 +122,14 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
                 </div>
               ))}
               {plannedItems.length === 0 && (
-                <div className="text-center py-4 border-2 border-dashed border-slate-100 rounded-xl text-slate-300 text-xs italic">
-                  尚未添加品种
+                <div className="text-center py-4 border-2 border-dashed border-slate-100 rounded-xl text-slate-300 text-[10px] italic font-medium">
+                  {t('shipment.no_records')}
                 </div>
               )}
             </div>
           </div>
 
-          <InputGroup label="创建日期" icon={<Calendar size={18} />}>
+          <InputGroup label={t('form.date')} icon={<Calendar size={18} />}>
             <input 
               type="date" 
               value={formData.sdate}
@@ -142,7 +146,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
           disabled={!isValid}
           className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100 disabled:opacity-50"
         >
-          创建出货单
+          {t('action.confirm')}
         </button>
       </footer>
 
@@ -159,14 +163,14 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
               initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
               className="bg-white w-full max-w-xs rounded-3xl shadow-2xl relative z-10 p-6 space-y-4"
             >
-              <h3 className="font-bold text-slate-800">添加品种与吨数</h3>
+              <h3 className="font-bold text-slate-800">{t('page.allocation')}</h3>
               <div className="space-y-3">
                 <select 
                   value={newItem.vid}
                   onChange={e => setNewItem({...newItem, vid: e.target.value})}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                 >
-                  <option value="">选择品种</option>
+                  <option value="">{t('form.select_variety')}</option>
                   {varieties?.map(v => (
                     <option key={v.vid} value={v.vid}>{v.vname}</option>
                   ))}
@@ -176,18 +180,18 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
                   step="0.001"
                   value={newItem.weight}
                   onChange={e => setNewItem({...newItem, weight: e.target.value})}
-                  placeholder="输入吨数 (t)"
+                  placeholder={t('form.total_weight_t')}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowItemModal(false)} className="flex-1 py-2 text-slate-400 font-bold">取消</button>
+                <button onClick={() => setShowItemModal(false)} className="flex-1 py-2 text-slate-400 font-bold">{t('action.no')}</button>
                 <button 
                   onClick={handleAddItem}
                   disabled={!newItem.vid || !newItem.weight}
                   className="flex-1 py-2 bg-emerald-500 text-white rounded-xl font-bold disabled:opacity-50"
                 >
-                  添加
+                  {t('action.add')}
                 </button>
               </div>
             </motion.div>
