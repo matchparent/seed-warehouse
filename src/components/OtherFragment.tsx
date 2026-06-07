@@ -24,6 +24,9 @@ export default function OtherFragment() {
     const destinations = await dataService.getDestinations();
     const batches = await dataService.getBatches(false);
     const records = await dataService.getSendingRecords(false);
+    const orderStatuses = await dataService.getOrderStatuses();
+    const orderCustomTypes = await dataService.getOrderCustomTypes();
+    const orders = await dataService.getOrders(true);
     
     // Fetch users and logs
     let users: any[] = [];
@@ -40,21 +43,32 @@ export default function OtherFragment() {
 
     let sql = `-- Cotton Seed Warehouse Export\n-- Date: ${new Date().toLocaleString()}\n\n`;
 
+    const esc = (val: string | null | undefined): string => {
+      if (val === null || val === undefined) return '';
+      return String(val).replace(/'/g, "''");
+    };
+
     // Schema
     sql += `CREATE TABLE tab_variaty (vid INTEGER PRIMARY KEY AUTO_INCREMENT, vname TEXT);\n`;
     sql += `CREATE TABLE tab_destination (did INTEGER PRIMARY KEY AUTO_INCREMENT, dname TEXT);\n`;
     sql += `CREATE TABLE tab_batch (bid INTEGER PRIMARY KEY AUTO_INCREMENT, bname TEXT, bvid INTEGER, bdate TEXT, bowei DECIMAL(10,3), bcwei DECIMAL(10,3), bstatus INTEGER, bcli TEXT, bmemo TEXT);\n`;
-    sql += `CREATE TABLE tab_sending_record (sid INTEGER PRIMARY KEY AUTO_INCREMENT, sstate INTEGER, splate TEXT, spinfo TEXT, sainfo TEXT, sdate TEXT, sftime TEXT, sdrpn TEXT, sdest INTEGER, smemo TEXT);\n`;
+    sql += `CREATE TABLE tab_sending_record (sid INTEGER PRIMARY KEY AUTO_INCREMENT, sstate INTEGER, splate TEXT, spinfo TEXT, sainfo TEXT, sdate TEXT, sftime TEXT, sdrpn TEXT, sdest INTEGER, smemo TEXT, soid INTEGER);\n`;
+    sql += `CREATE TABLE tab_order_status (osid INTEGER PRIMARY KEY AUTO_INCREMENT, oscname TEXT, osuname TEXT, osename TEXT);\n`;
+    sql += `CREATE TABLE tab_order_custom (ocid INTEGER PRIMARY KEY AUTO_INCREMENT, occname TEXT, ocuname TEXT, ocename TEXT);\n`;
+    sql += `CREATE TABLE tab_orders (oid INTEGER PRIMARY KEY AUTO_INCREMENT, status INTEGER, ocdate TEXT, odest INTEGER, octype INTEGER, ocname TEXT, ocphone TEXT, otr TEXT, otrc INTEGER, ossgi TEXT, oconid TEXT, oconfn TEXT, oarp TEXT, oard TEXT, oarr TEXT, oarpc INTEGER, ogsented TEXT, omemo TEXT);\n`;
     sql += `CREATE TABLE tab_user (uid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`key\` TEXT);\n`;
     sql += `CREATE TABLE tab_op_record (orid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`desc\` TEXT, optime TEXT);\n\n`;
 
     // Data
-    varieties.forEach(v => sql += `INSERT INTO tab_variaty VALUES (${v.vid}, '${v.vname}');\n`);
-    destinations.forEach(d => sql += `INSERT INTO tab_destination VALUES (${d.did}, '${d.dname}');\n`);
-    batches.forEach(b => sql += `INSERT INTO tab_batch VALUES (${b.bid}, '${b.bname}', ${b.bvid}, '${b.bdate}', ${b.bowei}, ${b.bcwei}, ${b.bstatus}, '${b.bcli}', '${b.bmemo}');\n`);
-    records.forEach(r => sql += `INSERT INTO tab_sending_record VALUES (${r.sid}, ${r.sstate}, '${r.splate}', '${r.spinfo}', '${r.sainfo}', '${r.sdate}', '${r.sftime || ''}', '${r.sdrpn}', ${r.sdest}, '${r.smemo}');\n`);
-    users.forEach(u => sql += `INSERT INTO tab_user VALUES (${u.uid}, '${u.spellname}', '${u.key}');\n`);
-    logs.forEach(l => sql += `INSERT INTO tab_op_record VALUES (${l.orid}, '${l.spellname}', '${l.desc.replace(/'/g, "''")}', '${l.optime}');\n`);
+    varieties.forEach(v => sql += `INSERT INTO tab_variaty VALUES (${v.vid}, '${esc(v.vname)}');\n`);
+    destinations.forEach(d => sql += `INSERT INTO tab_destination VALUES (${d.did}, '${esc(d.dname)}');\n`);
+    batches.forEach(b => sql += `INSERT INTO tab_batch VALUES (${b.bid}, '${esc(b.bname)}', ${b.bvid}, '${esc(b.bdate)}', ${b.bowei}, ${b.bcwei}, ${b.bstatus}, '${esc(b.bcli)}', '${esc(b.bmemo)}');\n`);
+    records.forEach(r => sql += `INSERT INTO tab_sending_record VALUES (${r.sid}, ${r.sstate}, '${esc(r.splate)}', '${esc(r.spinfo)}', '${esc(r.sainfo)}', '${esc(r.sdate)}', '${esc(r.sftime)}', '${esc(r.sdrpn)}', ${r.sdest}, '${esc(r.smemo)}', ${r.soid !== undefined ? r.soid : 'NULL'});\n`);
+    orderStatuses.forEach(os => sql += `INSERT INTO tab_order_status VALUES (${os.osid}, '${esc(os.oscname)}', '${esc(os.osuname)}', '${esc(os.osename)}');\n`);
+    orderCustomTypes.forEach(oc => sql += `INSERT INTO tab_order_custom VALUES (${oc.ocid}, '${esc(oc.occname)}', '${esc(oc.ocuname)}', '${esc(oc.ocename)}');\n`);
+    orders.forEach(o => sql += `INSERT INTO tab_orders VALUES (${o.oid}, ${o.status}, '${esc(o.ocdate)}', ${o.odest}, ${o.octype}, '${esc(o.ocname)}', '${esc(o.ocphone)}', '${esc(o.otr)}', ${o.otrc ?? 1}, '${esc(o.ossgi)}', '${esc(o.oconid)}', '${esc(o.oconfn)}', '${esc(o.oarp)}', '${esc(o.oard)}', '${esc(o.oarr)}', ${o.oarpc ?? 1}, '${esc(o.ogsented)}', '${esc(o.omemo)}');\n`);
+    users.forEach(u => sql += `INSERT INTO tab_user VALUES (${u.uid}, '${esc(u.spellname)}', '${esc(u.key)}');\n`);
+    logs.forEach(l => sql += `INSERT INTO tab_op_record VALUES (${l.orid}, '${esc(l.spellname)}', '${esc(l.desc)}', '${esc(l.optime)}');\n`);
 
     const blob = new Blob([sql], { type: 'text/sql' });
     const url = URL.createObjectURL(blob);
