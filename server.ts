@@ -10,6 +10,13 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
+  app.disable('etag');
+
+  app.use((req, res, next) => {
+    res.setHeader('Connection', 'close');
+    next();
+  });
+
   app.use(express.json());
 
   // Database initialization
@@ -328,10 +335,12 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
   const server = app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on http://localhost:${PORT}`);
     await initMySQL();
   });
+
   server.keepAliveTimeout = 0;
   server.headersTimeout = 0;
 }
