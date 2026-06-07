@@ -73,8 +73,8 @@ async function startServer() {
           table.integer('bvid').notNullable();
           table.string('bstatus').notNullable();
           table.string('bdate').notNullable();
-          table.float('bowei').notNullable();
-          table.float('bcwei').notNullable();
+          table.double('bowei').notNullable();
+          table.double('bcwei').notNullable();
           table.string('bcli');
           table.string('bmemo');
         });
@@ -180,6 +180,49 @@ async function startServer() {
            });
         }
       }
+
+      // Warehouse schema migration
+      const hasWarehouses = await db.schema.hasTable('tab_warehouses');
+      if (!hasWarehouses) {
+        await db.schema.createTable('tab_warehouses', (table) => {
+          table.integer('wid').primary();
+          table.string('wname').notNullable();
+          table.integer('wlocation').notNullable();
+        });
+        await db('tab_warehouses').insert([
+          { wid: -1, wname: 'Sino-Uzbek Logistic', wlocation: 1 },
+          { wid: -2, wname: 'Anasoy', wlocation: 7 },
+          { wid: -3, wname: 'Bagdad', wlocation: 5 }
+        ]);
+      }
+
+      // Ensure columns bowei and bcwei are DOUBLE instead of FLOAT to prevent rounding/double/float conversion issues
+      try {
+        await db.raw('ALTER TABLE tab_batch MODIFY COLUMN bowei DOUBLE NOT NULL');
+        await db.raw('ALTER TABLE tab_batch MODIFY COLUMN bcwei DOUBLE NOT NULL');
+      } catch (err) {
+        console.warn('Could not alter tab_batch columns to DOUBLE:', err);
+      }
+
+      // Add default bware to tab_batch
+      const columnsBatch = await db('tab_batch').columnInfo();
+      if (!columnsBatch.bware) {
+        await db.schema.table('tab_batch', (table) => {
+          table.integer('bware').defaultTo(-1);
+        });
+      }
+      // Migrate existing rows with null/1/undefined bware to -1
+      await db('tab_batch').whereNull('bware').orWhere('bware', 1).update('bware', -1);
+
+      // Add default sware to tab_sending_record
+      const columnsSending = await db('tab_sending_record').columnInfo();
+      if (!columnsSending.sware) {
+        await db.schema.table('tab_sending_record', (table) => {
+          table.integer('sware').defaultTo(-1);
+        });
+      }
+      // Migrate existing rows with null/1/undefined sware to -1
+      await db('tab_sending_record').whereNull('sware').orWhere('sware', 1).update('sware', -1);
 
       const variatyCount = await db('tab_variaty').count('vid as count').first();
       if ((variatyCount as any).count === 0) {
@@ -300,6 +343,7 @@ async function startServer() {
   setupTableRoutes('tab_orders', 'oid');
   setupTableRoutes('tab_order_status', 'osid');
   setupTableRoutes('tab_order_custom', 'ocid');
+  setupTableRoutes('tab_warehouses', 'wid');
 
   app.post("/api/auth/login", async (req, res) => {
     const { spellname, key } = req.body;

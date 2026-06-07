@@ -50,6 +50,7 @@ export const translations: Translations = {
   'batch.sort.status_desc': { zh: '状态 (先不通过)', uz: 'Holat (avval taqiq)', en: 'Status (Rejected First)' },
   'batch.available': { zh: '可发货', uz: 'Ruxsat', en: 'Available' },
   'batch.not_available': { zh: '不可发货', uz: 'Taqiq', en: 'On Hold' },
+  'batch.status.transfer': { zh: '转运待收', uz: 'Transfer kutilmoqda', en: 'Pending Transfer' },
   'batch.memo': { zh: '批次备注', uz: 'Izoh (ixtiyoriy)', en: 'Batch Memo' },
   'batch.max_adj': { zh: '最大可调至', uz: 'Maks', en: 'Max adjustment' },
   'batch.weight_exceeded': { zh: '修改值大于总重', uz: 'Vazndan oshdi!', en: 'Exceeds total weight!' },
@@ -69,6 +70,7 @@ export const translations: Translations = {
   'shipment.status.unknown': { zh: '未知', uz: 'Noma\'lum', en: 'Unknown' },
   'shipment.driver_tel': { zh: '司机电话', uz: 'Tel:', en: 'Driver Tel' },
   'shipment.memo': { zh: '发货备注', uz: 'Izoh (ixtiyoriy)', en: 'Shipment Memo' },
+  'shipment.select_order_hint': { zh: '请先选择订单或转运目的货仓以进行货物配置', uz: 'Ehtiyot qismlarni kiritish uchun oldin buyurtma yoki transfer omborini tanlang', en: 'Please select an order or transfer destination warehouse first to enable cargo configuration' },
 
   // Statistics
   'stats.overview': { zh: '品种库存概览', uz: 'Navlar zaxirasi', en: 'Variety Stock Overview' },

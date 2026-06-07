@@ -27,7 +27,7 @@ export default function StatisticsFragment() {
   const varieties = useVarieties();
   const batches = useBatches();
   const allRecords = useSendingRecords();
-  const records = allRecords?.filter(r => r.sstate === ShipmentState.COMPLETED);
+  const records = allRecords?.filter(r => r.sstate === ShipmentState.COMPLETED && (r.soid === undefined || r.soid === null || r.soid >= 0));
   const destinations = useDestinations();
 
   if (!varieties || !batches || !records || !destinations) return null;

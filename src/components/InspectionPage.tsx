@@ -58,85 +58,107 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
       sdrpn: phone
     });
 
-    // 3. Update associated order's ogsented & complete check
+    // 3. Update associated order or handle warehouse transfer
     const record = await dataService.getSendingRecord(shipmentId);
-    if (record && record.soid) {
-      const orders = await dataService.getOrders(true);
-      const order = orders.find(o => o.oid === record.soid);
-      if (order) {
-        // Parse current shipment dispatched weights from spinfo
-        const shipmentDispatched: { [vid: number]: number } = {};
-        if (record.spinfo) {
-          record.spinfo.split(',').forEach(item => {
-            const parts = item.split('/');
-            if (parts.length === 2) {
-              const vid = parseInt(parts[0]);
-              const weight = parseFloat(parts[1]);
-              if (!isNaN(vid) && !isNaN(weight)) {
-                shipmentDispatched[vid] = (shipmentDispatched[vid] || 0) + weight;
-              }
-            }
+    if (record) {
+      if (record.soid && record.soid < 0) {
+        // Cargo Transfer Dispatch
+        const destWarehouseId = record.soid;
+        for (const alloc of allocations) {
+          const origBatch = allBatches.find(b => b.bid === alloc.bid);
+          const origVid = origBatch ? origBatch.bvid : 1;
+          
+          await dataService.addBatch({
+            bname: origBatch ? origBatch.bname : 'Cargo',
+            bvid: origVid,
+            bowei: alloc.deduct,
+            bcwei: alloc.deduct,
+            bcli: record.splate,
+            bdate: new Date().toISOString().split('T')[0],
+            bstatus: 2, // 2 represents "pending receipt at destination warehouse for transfer"
+            bware: destWarehouseId,
+            bmemo: ''
           });
         }
-
-        // Parse order's ogsented
-        const orderSent: { [vid: number]: number } = {};
-        if (order.ogsented) {
-          order.ogsented.split(',').forEach(item => {
-            const parts = item.split('/');
-            if (parts.length === 2) {
-              const vid = parseInt(parts[0]);
-              const qty = parseFloat(parts[1]);
-              if (!isNaN(vid) && !isNaN(qty)) {
-                orderSent[vid] = qty;
+      } else if (record.soid) {
+        // Normal Order - Update associated order's ogsented & complete check
+        const orders = await dataService.getOrders(true);
+        const order = orders.find(o => o.oid === record.soid);
+        if (order) {
+          // Parse current shipment dispatched weights from spinfo
+          const shipmentDispatched: { [vid: number]: number } = {};
+          if (record.spinfo) {
+            record.spinfo.split(',').forEach(item => {
+              const parts = item.split('/');
+              if (parts.length === 2) {
+                const vid = parseInt(parts[0]);
+                const weight = parseFloat(parts[1]);
+                if (!isNaN(vid) && !isNaN(weight)) {
+                  shipmentDispatched[vid] = (shipmentDispatched[vid] || 0) + weight;
+                }
               }
-            }
-          });
-        }
-
-        // Add current shipment weights to orderSent
-        Object.entries(shipmentDispatched).forEach(([vidStr, weight]) => {
-          const vid = parseInt(vidStr);
-          orderSent[vid] = (orderSent[vid] || 0) + weight;
-        });
-
-        const updatedOgsented = Object.entries(orderSent)
-          .map(([vid, qty]) => `${vid}/${qty}`)
-          .join(',');
-
-        // Check if all varieties are fully shipped
-        const orderDemands: { [vid: number]: number } = {};
-        if (order.ossgi) {
-          order.ossgi.split(',').forEach(item => {
-            const parts = item.split('/');
-            if (parts.length === 2) {
-              const vid = parseInt(parts[0]);
-              const qty = parseFloat(parts[1]);
-              if (!isNaN(vid) && !isNaN(qty)) {
-                orderDemands[vid] = qty;
-              }
-            }
-          });
-        }
-
-        let allMet = true;
-        Object.entries(orderDemands).forEach(([vidStr, targetQty]) => {
-          const vid = parseInt(vidStr);
-          const sentQty = orderSent[vid] || 0;
-          if (sentQty < targetQty - 0.001) {
-            allMet = false;
+            });
           }
-        });
 
-        const updates: Partial<Order> = {
-          ogsented: updatedOgsented
-        };
+          // Parse order's ogsented
+          const orderSent: { [vid: number]: number } = {};
+          if (order.ogsented) {
+            order.ogsented.split(',').forEach(item => {
+              const parts = item.split('/');
+              if (parts.length === 2) {
+                const vid = parseInt(parts[0]);
+                const qty = parseFloat(parts[1]);
+                if (!isNaN(vid) && !isNaN(qty)) {
+                  orderSent[vid] = qty;
+                }
+              }
+            });
+          }
 
-        if (allMet) {
-          updates.status = OrderStatus.COMPLETED;
+          // Add current shipment weights to orderSent
+          Object.entries(shipmentDispatched).forEach(([vidStr, weight]) => {
+            const vid = parseInt(vidStr);
+            orderSent[vid] = (orderSent[vid] || 0) + weight;
+          });
+
+          const updatedOgsented = Object.entries(orderSent)
+            .map(([vid, qty]) => `${vid}/${qty}`)
+            .join(',');
+
+          // Check if all varieties are fully shipped
+          const orderDemands: { [vid: number]: number } = {};
+          if (order.ossgi) {
+            order.ossgi.split(',').forEach(item => {
+              const parts = item.split('/');
+              if (parts.length === 2) {
+                const vid = parseInt(parts[0]);
+                const qty = parseFloat(parts[1]);
+                if (!isNaN(vid) && !isNaN(qty)) {
+                  orderDemands[vid] = qty;
+                }
+              }
+            });
+          }
+
+          let allMet = true;
+          Object.entries(orderDemands).forEach(([vidStr, targetQty]) => {
+            const vid = parseInt(vidStr);
+            const sentQty = orderSent[vid] || 0;
+            if (sentQty < targetQty - 0.001) {
+              allMet = false;
+            }
+          });
+
+          const updates: Partial<Order> = {
+            ogsented: updatedOgsented
+          };
+
+          if (allMet) {
+            updates.status = OrderStatus.COMPLETED;
+          }
+
+          await dataService.updateOrder(order.oid!, updates);
         }
-
-        await dataService.updateOrder(order.oid!, updates);
       }
     }
     

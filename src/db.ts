@@ -4,7 +4,7 @@
  */
 
 import Dexie, { type Table } from 'dexie';
-import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType } from './types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType, Warehouse } from './types';
 
 export class CottonSeedDB extends Dexie {
   tab_variaty!: Table<Variety, number>;
@@ -16,6 +16,7 @@ export class CottonSeedDB extends Dexie {
   tab_orders!: Table<Order, number>;
   tab_user!: Table<{ uid?: number, spellname: string, key: string }, number>;
   tab_op_record!: Table<{ orid?: number, spellname: string, desc: string, optime: string }, number>;
+  tab_warehouses!: Table<Warehouse, number>;
 
   constructor() {
     super('CottonSeedDB');
@@ -28,7 +29,8 @@ export class CottonSeedDB extends Dexie {
       tab_order_custom: '++ocid, occname',
       tab_orders: '++oid, status, ocdate, odest, octype',
       tab_user: '++uid, spellname, key',
-      tab_op_record: '++orid, spellname, optime'
+      tab_op_record: '++orid, spellname, optime',
+      tab_warehouses: 'wid, wname, wlocation'
     });
   }
 }
@@ -95,6 +97,31 @@ export async function initDB() {
         { ocid: 3, occname: 'AKIS', ocuname: 'AKIS', ocename: 'AKIS' },
         { ocid: 4, occname: '散户', ocuname: 'Xususiy fermerlar', ocename: 'Private Farmer' }
       ]);
+    }
+
+    const warehouseCount = await db.tab_warehouses.count();
+    if (warehouseCount === 0) {
+      await db.tab_warehouses.bulkPut([
+        { wid: -1, wname: 'Sino-Uzbek Logistic', wlocation: 1 },
+        { wid: -2, wname: 'Anasoy', wlocation: 7 },
+        { wid: -3, wname: 'Bagdad', wlocation: 5 }
+      ]);
+    }
+
+    // Migrate existing client-side batches with undefined, null, or 1 to -1 (Sino-Uzbek Logistic)
+    const batches = await db.tab_batch.toArray();
+    for (const b of batches) {
+      if (b.bware === undefined || b.bware === null || b.bware === 1) {
+        await db.tab_batch.update(b.bid!, { bware: -1 });
+      }
+    }
+
+    // Migrate existing client-side sending records with undefined, null, or 1 to -1
+    const records = await db.tab_sending_record.toArray();
+    for (const r of records) {
+      if (r.sware === undefined || r.sware === null || r.sware === 1) {
+        await db.tab_sending_record.update(r.sid!, { sware: -1 });
+      }
     }
   } finally {
     isInitializing = false;

@@ -6,9 +6,9 @@
 import { db } from '../db';
 import * as XLSX from 'xlsx';
 import { ShipmentState } from '../types';
-import { dataService } from '../lib/dataService';
+import { dataService, useWarehouses, useDestinations } from '../lib/dataService';
 import { useI18n, Language } from '../lib/i18n';
-import { Database, FileSpreadsheet, Download, ShieldCheck, Languages, AlertCircle, Plus } from 'lucide-react';
+import { Database, FileSpreadsheet, Download, ShieldCheck, Languages, AlertCircle, Plus, Home } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState } from 'react';
@@ -17,6 +17,16 @@ export default function OtherFragment() {
   const { t, lang, setLang } = useI18n();
   const [showSQLConfirm, setShowSQLConfirm] = useState(false);
   const [showExcelConfirm, setShowExcelConfirm] = useState(false);
+
+  const warehouses = useWarehouses();
+  const destinations = useDestinations();
+  const [currentWarehouseId, setCurrentWarehouseId] = useState(() => localStorage.getItem('current_warehouse_id') || 'all');
+
+  const handleWarehouseChange = (id: string) => {
+    setCurrentWarehouseId(id);
+    localStorage.setItem('current_warehouse_id', id);
+    window.dispatchEvent(new Event('warehouse_changed'));
+  };
 
   const exportSQL = async () => {
     setShowSQLConfirm(false);
@@ -27,6 +37,7 @@ export default function OtherFragment() {
     const orderStatuses = await dataService.getOrderStatuses();
     const orderCustomTypes = await dataService.getOrderCustomTypes();
     const orders = await dataService.getOrders(true);
+    const warehouses = await dataService.getWarehouses();
     
     // Fetch users and logs
     let users: any[] = [];
@@ -51,24 +62,26 @@ export default function OtherFragment() {
     // Schema
     sql += `CREATE TABLE tab_variaty (vid INTEGER PRIMARY KEY AUTO_INCREMENT, vname TEXT);\n`;
     sql += `CREATE TABLE tab_destination (did INTEGER PRIMARY KEY AUTO_INCREMENT, dname TEXT);\n`;
-    sql += `CREATE TABLE tab_batch (bid INTEGER PRIMARY KEY AUTO_INCREMENT, bname TEXT, bvid INTEGER, bdate TEXT, bowei DECIMAL(10,3), bcwei DECIMAL(10,3), bstatus INTEGER, bcli TEXT, bmemo TEXT);\n`;
-    sql += `CREATE TABLE tab_sending_record (sid INTEGER PRIMARY KEY AUTO_INCREMENT, sstate INTEGER, splate TEXT, spinfo TEXT, sainfo TEXT, sdate TEXT, sftime TEXT, sdrpn TEXT, sdest INTEGER, smemo TEXT, soid INTEGER);\n`;
+    sql += `CREATE TABLE tab_batch (bid INTEGER PRIMARY KEY AUTO_INCREMENT, bname TEXT, bvid INTEGER, bdate TEXT, bowei DECIMAL(10,3), bcwei DECIMAL(10,3), bstatus INTEGER, bcli TEXT, bmemo TEXT, bware INTEGER);\n`;
+    sql += `CREATE TABLE tab_sending_record (sid INTEGER PRIMARY KEY AUTO_INCREMENT, sstate INTEGER, splate TEXT, spinfo TEXT, sainfo TEXT, sdate TEXT, sftime TEXT, sdrpn TEXT, sdest INTEGER, smemo TEXT, soid INTEGER, sware INTEGER);\n`;
     sql += `CREATE TABLE tab_order_status (osid INTEGER PRIMARY KEY AUTO_INCREMENT, oscname TEXT, osuname TEXT, osename TEXT);\n`;
     sql += `CREATE TABLE tab_order_custom (ocid INTEGER PRIMARY KEY AUTO_INCREMENT, occname TEXT, ocuname TEXT, ocename TEXT);\n`;
     sql += `CREATE TABLE tab_orders (oid INTEGER PRIMARY KEY AUTO_INCREMENT, status INTEGER, ocdate TEXT, odest INTEGER, octype INTEGER, ocname TEXT, ocphone TEXT, otr TEXT, otrc INTEGER, ossgi TEXT, oconid TEXT, oconfn TEXT, oarp TEXT, oard TEXT, oarr TEXT, oarpc INTEGER, ogsented TEXT, omemo TEXT);\n`;
     sql += `CREATE TABLE tab_user (uid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`key\` TEXT);\n`;
-    sql += `CREATE TABLE tab_op_record (orid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`desc\` TEXT, optime TEXT);\n\n`;
+    sql += `CREATE TABLE tab_op_record (orid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`desc\` TEXT, optime TEXT);\n`;
+    sql += `CREATE TABLE tab_warehouses (wid INTEGER PRIMARY KEY, wname TEXT, wlocation INTEGER);\n\n`;
 
     // Data
     varieties.forEach(v => sql += `INSERT INTO tab_variaty VALUES (${v.vid}, '${esc(v.vname)}');\n`);
     destinations.forEach(d => sql += `INSERT INTO tab_destination VALUES (${d.did}, '${esc(d.dname)}');\n`);
-    batches.forEach(b => sql += `INSERT INTO tab_batch VALUES (${b.bid}, '${esc(b.bname)}', ${b.bvid}, '${esc(b.bdate)}', ${b.bowei}, ${b.bcwei}, ${b.bstatus}, '${esc(b.bcli)}', '${esc(b.bmemo)}');\n`);
-    records.forEach(r => sql += `INSERT INTO tab_sending_record VALUES (${r.sid}, ${r.sstate}, '${esc(r.splate)}', '${esc(r.spinfo)}', '${esc(r.sainfo)}', '${esc(r.sdate)}', '${esc(r.sftime)}', '${esc(r.sdrpn)}', ${r.sdest}, '${esc(r.smemo)}', ${r.soid !== undefined ? r.soid : 'NULL'});\n`);
+    batches.forEach(b => sql += `INSERT INTO tab_batch VALUES (${b.bid}, '${esc(b.bname)}', ${b.bvid}, '${esc(b.bdate)}', ${b.bowei}, ${b.bcwei}, ${b.bstatus}, '${esc(b.bcli)}', '${esc(b.bmemo)}', ${b.bware !== undefined ? b.bware : -1});\n`);
+    records.forEach(r => sql += `INSERT INTO tab_sending_record VALUES (${r.sid}, ${r.sstate}, '${esc(r.splate)}', '${esc(r.spinfo)}', '${esc(r.sainfo)}', '${esc(r.sdate)}', '${esc(r.sftime)}', '${esc(r.sdrpn)}', ${r.sdest}, '${esc(r.smemo)}', ${r.soid !== undefined ? r.soid : 'NULL'}, ${r.sware !== undefined ? r.sware : -1});\n`);
     orderStatuses.forEach(os => sql += `INSERT INTO tab_order_status VALUES (${os.osid}, '${esc(os.oscname)}', '${esc(os.osuname)}', '${esc(os.osename)}');\n`);
     orderCustomTypes.forEach(oc => sql += `INSERT INTO tab_order_custom VALUES (${oc.ocid}, '${esc(oc.occname)}', '${esc(oc.ocuname)}', '${esc(oc.ocename)}');\n`);
     orders.forEach(o => sql += `INSERT INTO tab_orders VALUES (${o.oid}, ${o.status}, '${esc(o.ocdate)}', ${o.odest}, ${o.octype}, '${esc(o.ocname)}', '${esc(o.ocphone)}', '${esc(o.otr)}', ${o.otrc ?? 1}, '${esc(o.ossgi)}', '${esc(o.oconid)}', '${esc(o.oconfn)}', '${esc(o.oarp)}', '${esc(o.oard)}', '${esc(o.oarr)}', ${o.oarpc ?? 1}, '${esc(o.ogsented)}', '${esc(o.omemo)}');\n`);
     users.forEach(u => sql += `INSERT INTO tab_user VALUES (${u.uid}, '${esc(u.spellname)}', '${esc(u.key)}');\n`);
     logs.forEach(l => sql += `INSERT INTO tab_op_record VALUES (${l.orid}, '${esc(l.spellname)}', '${esc(l.desc)}', '${esc(l.optime)}');\n`);
+    warehouses.forEach(w => sql += `INSERT INTO tab_warehouses VALUES (${w.wid}, '${esc(w.wname)}', ${w.wlocation});\n`);
 
     const blob = new Blob([sql], { type: 'text/sql' });
     const url = URL.createObjectURL(blob);
@@ -120,6 +133,52 @@ export default function OtherFragment() {
   return (
     <div className="space-y-6">
       <div className="grid gap-3">
+        {/* Active Warehouse Switching Card */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-emerald-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+              <Home size={20} className="text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-bold text-slate-700">切换仓库 / Active Warehouse</div>
+              <div className="text-[10px] text-slate-400">切换当前进行中和管理的源货仓 / Toggle current focus warehouse</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              onClick={() => handleWarehouseChange('all')}
+              className={cn(
+                "py-3 px-4 rounded-xl text-xs font-bold transition-all border text-left flex justify-between items-center cursor-pointer",
+                currentWarehouseId === 'all'
+                  ? "bg-slate-800 text-white border-slate-800 shadow"
+                  : "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100"
+              )}
+            >
+              <span>全部仓库 / All Warehouses</span>
+              <span className="text-[10px] opacity-75 font-mono">ALL</span>
+            </button>
+            {warehouses?.map(w => {
+              const dest = destinations?.find(d => d.did === w.wlocation);
+              const isSelected = currentWarehouseId === String(w.wid);
+              return (
+                <button
+                  key={w.wid}
+                  onClick={() => handleWarehouseChange(String(w.wid))}
+                  className={cn(
+                    "py-3 px-4 rounded-xl text-xs font-bold transition-all border text-left flex flex-col gap-0.5 cursor-pointer",
+                    isSelected
+                      ? "bg-slate-800 text-white border-slate-800 shadow"
+                      : "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100"
+                  )}
+                >
+                  <span className="truncate">{dest ? dest.dname : 'Location'}</span>
+                  <span className={cn("text-[10px] font-mono truncate", isSelected ? "text-emerald-300" : "text-slate-400")}>{w.wname}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">

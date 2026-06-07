@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType } from '../types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType, Warehouse } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState, useEffect } from 'react';
 
@@ -79,6 +79,20 @@ class DataService {
     }));
   }
 
+  async getWarehouses(): Promise<Warehouse[]> {
+    if (this.mode === 'dexie') {
+      const data = await db.tab_warehouses.toArray();
+      return data.map(w => ({ ...w, wid: Number(w.wid), wlocation: Number(w.wlocation) }));
+    }
+    const res = await fetch('/api/tab_warehouses');
+    const data = await res.json();
+    return data.map((w: any) => ({
+      ...w,
+      wid: Number(w.wid),
+      wlocation: Number(w.wlocation)
+    }));
+  }
+
   async getBatches(ordered = true): Promise<Batch[]> {
     const toNum = (v: any) => {
       const n = Number(v);
@@ -94,7 +108,8 @@ class DataService {
         bvid: toNum(b.bvid),
         bstatus: toNum(b.bstatus),
         bowei: toNum(b.bowei),
-        bcwei: toNum(b.bcwei)
+        bcwei: toNum(b.bcwei),
+        bware: b.bware !== undefined && b.bware !== null ? toNum(b.bware) : -1
       }));
     }
     const res = await fetch(ordered ? '/api/tab_batch/ordered' : '/api/tab_batch');
@@ -106,7 +121,8 @@ class DataService {
       bvid: toNum(b.bvid),
       bstatus: toNum(b.bstatus),
       bowei: toNum(b.bowei),
-      bcwei: toNum(b.bcwei)
+      bcwei: toNum(b.bcwei),
+      bware: b.bware !== undefined && b.bware !== null ? toNum(b.bware) : -1
     }));
   }
 
@@ -134,7 +150,8 @@ class DataService {
       sid: toNum(r.sid),
       sstate: toNum(r.sstate),
       sdest: toNum(r.sdest),
-      soid: r.soid ? toNum(r.soid) : undefined
+      soid: r.soid ? toNum(r.soid) : undefined,
+      sware: r.sware !== undefined && r.sware !== null ? toNum(r.sware) : -1
     }));
   }
 
@@ -363,7 +380,8 @@ export function useBatches(ordered = true) {
         bvid: toNum(b.bvid),
         bstatus: toNum(b.bstatus),
         bowei: toNum(b.bowei),
-        bcwei: toNum(b.bcwei)
+        bcwei: toNum(b.bcwei),
+        bware: b.bware !== undefined && b.bware !== null ? toNum(b.bware) : -1
       }))
     );
   }, [ordered]);
@@ -387,11 +405,24 @@ export function useSendingRecords(ordered = true, date?: string) {
       sid: toNum(r.sid),
       sstate: toNum(r.sstate),
       sdest: toNum(r.sdest),
-      soid: r.soid ? toNum(r.soid) : undefined
+      soid: r.soid ? toNum(r.soid) : undefined,
+      sware: r.sware !== undefined && r.sware !== null ? toNum(r.sware) : -1
     })));
   }, [ordered, date]);
   const [mysqlData, setMysqlData] = useState<SendingRecord[] | undefined>(undefined);
   useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getSendingRecords(ordered, date).then(setMysqlData); }, [ordered, date]);
+  return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
+}
+
+export function useWarehouses() {
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const dexieData = useLiveQuery(() => db.tab_warehouses.toArray().then(data => data.map(w => ({ ...w, wid: toNum(w.wid), wlocation: toNum(w.wlocation) }))));
+  const [mysqlData, setMysqlData] = useState<Warehouse[] | undefined>(undefined);
+  useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getWarehouses().then(setMysqlData); }, []);
   return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
 }
 

@@ -4,24 +4,36 @@
  */
 
 import React, { useState } from 'react';
-import { ArrowLeft, Save, Calendar, Truck, Tag, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, Truck, Tag, FileText, Home } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useVarieties, dataService } from '../lib/dataService';
+import { useVarieties, useWarehouses, useDestinations, dataService } from '../lib/dataService';
 import { useI18n } from '../lib/i18n';
+
+function getDefaultWarehouseId() {
+  const cached = localStorage.getItem('current_warehouse_id');
+  if (cached && cached !== 'all') {
+    return Number(cached);
+  }
+  return -1; // Default selector is wid = -1 (Sino-Uzbek Logistic)
+}
 
 export default function AddBatchPage({ onBack }: { onBack: () => void }) {
   const { t } = useI18n();
   const varieties = useVarieties();
+  const warehouses = useWarehouses();
+  const destinations = useDestinations();
+
   const [formData, setFormData] = useState({
     bname: '',
     bvid: '',
     bdate: new Date().toISOString().split('T')[0],
     bowei: '',
     bcli: '',
-    bmemo: ''
+    bmemo: '',
+    bware: String(getDefaultWarehouseId())
   });
 
-  const isValid = formData.bname && formData.bvid && formData.bdate && formData.bowei && formData.bcli;
+  const isValid = formData.bname && formData.bvid && formData.bdate && formData.bowei && formData.bcli && formData.bware;
 
   const handleSubmit = async () => {
     if (!isValid) return;
@@ -34,7 +46,8 @@ export default function AddBatchPage({ onBack }: { onBack: () => void }) {
       bcwei: weight,
       bstatus: 0,
       bcli: formData.bcli,
-      bmemo: formData.bmemo
+      bmemo: formData.bmemo,
+      bware: parseInt(formData.bware)
     });
     onBack();
   };
@@ -72,6 +85,28 @@ export default function AddBatchPage({ onBack }: { onBack: () => void }) {
               {varieties?.map(v => (
                 <option key={v.vid} value={v.vid}>{v.vname}</option>
               ))}
+            </select>
+          </InputGroup>
+
+          {/* New Warehouse Field Selection */}
+          <InputGroup label="所属仓库 / Warehouse" icon={<Home size={18} />}>
+            <select 
+              value={formData.bware}
+              onChange={e => setFormData({...formData, bware: e.target.value})}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-bold"
+            >
+              <option value="">选择仓库 / Select Warehouse</option>
+              {/* Also support wid=1 in selector fallback just in case */}
+              <option value="1">默认/主仓库 (Main Warehouse)</option>
+              {warehouses?.map(w => {
+                const dest = destinations?.find(d => d.did === w.wlocation);
+                const destLabel = dest ? dest.dname : `Location ${w.wlocation}`;
+                return (
+                  <option key={w.wid} value={w.wid}>
+                    {destLabel} ：{w.wname}
+                  </option>
+                );
+              })}
             </select>
           </InputGroup>
 

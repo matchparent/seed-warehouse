@@ -20,9 +20,10 @@ export interface Batch {
   bdate: string;
   bowei: number; // Total weight
   bcwei: number; // Current weight
-  bstatus: number; // 0: No, 1: Yes
+  bstatus: number; // 0: No, 1: Yes, 2:待确认转运
   bcli: string; // Truck plate
   bmemo: string;
+  bware?: number; // Warehouse ID
 }
 
 export enum ShipmentState {
@@ -78,6 +79,12 @@ export interface Order {
   omemo: string;
 }
 
+export interface Warehouse {
+  wid: number;
+  wname: string;
+  wlocation: number; // Foreign key to tab_destination (did)
+}
+
 export interface SendingRecord {
   sid?: number;
   sstate: ShipmentState;
@@ -89,5 +96,6 @@ export interface SendingRecord {
   sdrpn: string;
   sdest: number;
   smemo: string;
-  soid?: number; // Foreign key to connect Order's oid
+  soid?: number; // Foreign key to connect Order's oid, or Warehouse wid (if negative)
+  sware?: number; // Source Warehouse ID
 }

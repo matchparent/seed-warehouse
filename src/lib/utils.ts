@@ -53,8 +53,8 @@ export function isWeightExceeded(weight: number | string, limit: number | string
 
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '-';
-  // If format is like "1-2026.05.22,2-2026.06.01", find the state 1 date
-  if (dateStr.includes('-')) {
+  // If format is a state history list starting with "X-", like "1-2026.05.22,2-2026.06.01"
+  if (/^\d-/.test(dateStr)) {
     const records = dateStr.split(',');
     const firstRecord = records.find(r => r.startsWith('1-'));
     if (firstRecord) return firstRecord.split('-')[1];

@@ -32,6 +32,21 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
   const destinations = useDestinations();
   const batches = useBatches();
 
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState(() => localStorage.getItem('current_warehouse_id') || 'all');
+  React.useEffect(() => {
+    const handleChanged = () => {
+      setSelectedWarehouseId(localStorage.getItem('current_warehouse_id') || 'all');
+    };
+    window.addEventListener('warehouse_changed', handleChanged);
+    return () => window.removeEventListener('warehouse_changed', handleChanged);
+  }, []);
+
+  const filteredRecords = React.useMemo(() => {
+    if (!records) return [];
+    if (selectedWarehouseId === 'all') return records;
+    return records.filter(r => (r.sware !== undefined && r.sware !== null ? r.sware : -1) === parseInt(selectedWarehouseId));
+  }, [records, selectedWarehouseId]);
+
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [deleteModal, setDeleteModal] = useState<number | null>(null);
   const [withdrawModal, setWithdrawModal] = useState<number | null>(null);
@@ -52,8 +67,8 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
     return info.split(',').map(item => {
       const [id, weight] = item.split('/');
       const name = type === 'variety' 
-        ? varieties?.find(v => v.vid === parseInt(id))?.vname 
-        : batches?.find(b => b.bid === parseInt(id))?.bname;
+         ? varieties?.find(v => v.vid === parseInt(id))?.vname 
+         : batches?.find(b => b.bid === parseInt(id))?.bname;
       return { name, weight };
     });
   };
@@ -91,7 +106,7 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
       </div>
 
       <div className="grid gap-3">
-        {records?.map((record) => {
+        {filteredRecords.map((record) => {
           const stateInfo = getStateLabel(record.sstate);
           const showPlanned = record.sstate === ShipmentState.NEW || record.sstate === ShipmentState.ALLOCATED;
           const info = showPlanned ? parseInfo(record.spinfo, 'variety') : parseInfo(record.sainfo, 'batch');
@@ -206,7 +221,7 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
             </motion.div>
           );
         })}
-        {records?.length === 0 && (
+        {filteredRecords.length === 0 && (
           <div className="text-center py-12 text-slate-400 text-sm italic font-medium">
             {t('shipment.no_records')}
           </div>

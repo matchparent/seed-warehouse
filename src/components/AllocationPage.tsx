@@ -31,8 +31,24 @@ export default function AllocationPage({ shipmentId, onBack, onComplete }: { shi
 
   const batches = useMemo(() => {
     if (!allBatches) return [];
-    return allBatches.filter(b => b.bstatus === 1 && b.bcwei > 0);
-  }, [allBatches]);
+    
+    // Filter available batches to only match the source warehouse of the shipment (sware).
+    let sourceWarehouseId = -1;
+    if (shipment && shipment.sware !== undefined && shipment.sware !== null) {
+      sourceWarehouseId = shipment.sware;
+    } else {
+      const cached = localStorage.getItem('current_warehouse_id');
+      if (cached && cached !== 'all') {
+        sourceWarehouseId = parseInt(cached);
+      }
+    }
+
+    return allBatches.filter(b => {
+      if (b.bstatus !== 1 || b.bcwei <= 0) return false;
+      const bwareId = b.bware !== undefined && b.bware !== null ? b.bware : -1;
+      return bwareId === sourceWarehouseId;
+    });
+  }, [allBatches, shipment]);
 
   const varietyProgress = useMemo(() => {
     if (!plannedItems || !batches) return [];

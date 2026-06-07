@@ -17,11 +17,12 @@ import {
   Truck,
   FileText,
   Filter,
-  ArrowUpDown
+  ArrowUpDown,
+  Home
 } from 'lucide-react';
 import { cn, formatWeight, formatDate, copyToClipboard, isWeightExceeded, safeToFixed } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { useBatches, useVarieties, useSendingRecords, useBatch, dataService } from '../lib/dataService';
+import { useBatches, useVarieties, useSendingRecords, useBatch, useWarehouses, useDestinations, dataService } from '../lib/dataService';
 import { useI18n } from '../lib/i18n';
 
 type FilterType = 'all' | 'remaining' | 'no_remaining' | 'approved' | 'rejected' | string;
@@ -31,6 +32,18 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
   const { t } = useI18n();
   const batches = useBatches();
   const varieties = useVarieties();
+  const warehouses = useWarehouses();
+  const destinations = useDestinations();
+
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState(() => localStorage.getItem('current_warehouse_id') || 'all');
+  React.useEffect(() => {
+    const handleChanged = () => {
+      setSelectedWarehouseId(localStorage.getItem('current_warehouse_id') || 'all');
+    };
+    window.addEventListener('warehouse_changed', handleChanged);
+    return () => window.removeEventListener('warehouse_changed', handleChanged);
+  }, []);
+
   const [filterType, setFilterType] = useState<FilterType>('remaining');
   const [sortBy, setSortBy] = useState<SortType>('date_asc');
   
@@ -44,12 +57,25 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
 
   const getVarietyName = (vid: number) => varieties?.find(v => v.vid === vid)?.vname || '未知';
 
+  const getWarehouseLabel = (bwareId?: number) => {
+    const wid = bwareId !== undefined && bwareId !== null ? bwareId : -1;
+    const w = warehouses?.find(wh => wh.wid === wid);
+    if (!w) return `仓库/Warehouse ${wid}`;
+    const dest = destinations?.find(d => d.did === w.wlocation);
+    return `${dest ? dest.dname : 'Unknown'} ：${w.wname}`;
+  };
+
   const filteredAndSortedBatches = React.useMemo(() => {
     if (!batches) return [];
 
     let result = [...batches];
 
-    // Filter
+    // Filter by Warehouse
+    if (selectedWarehouseId !== 'all') {
+      result = result.filter(b => (b.bware !== undefined && b.bware !== null ? b.bware : -1) === parseInt(selectedWarehouseId));
+    }
+
+    // Filter by general status
     if (filterType === 'remaining') {
       result = result.filter(b => b.bcwei > 0);
     } else if (filterType === 'no_remaining') {
@@ -79,13 +105,21 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
     });
 
     return result;
-  }, [batches, filterType, sortBy]);
+  }, [batches, filterType, sortBy, selectedWarehouseId]);
 
   const handleCopySummary = async () => {
     if (!batches || !varieties) return;
     
-    const summary = batches
-      .filter(b => b.bcwei > 0)
+    const summaryFiltered = batches.filter(b => {
+      if (b.bcwei <= 0) return false;
+      if (selectedWarehouseId !== 'all') {
+        const bware = b.bware !== undefined && b.bware !== null ? b.bware : -1;
+        return bware === parseInt(selectedWarehouseId);
+      }
+      return true;
+    });
+
+    const summary = summaryFiltered
       .map(b => {
         const vname = getVarietyName(b.bvid);
         const weightStr = `剩余 ${safeToFixed(b.bcwei, 3).padStart(8)} 吨`;
@@ -154,12 +188,19 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
             <div 
               className={cn(
                 "w-3 h-3 rounded-full shrink-0",
-                batch.bcwei === 0 ? "bg-slate-300" : (batch.bstatus === 1 ? "bg-[#AFC3A8]" : "bg-[#FF2525]")
+                batch.bcwei === 0 ? "bg-slate-300" : (batch.bstatus === 2 ? "bg-yellow-400" : (batch.bstatus === 1 ? "bg-[#AFC3A8]" : "bg-[#FF2525]"))
               )}
             />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start">
-                <span className="font-bold text-slate-700 truncate">{t('batch.label')}: {batch.bname}</span>
+                <div className="flex items-center flex-wrap gap-1">
+                  <span className="font-bold text-slate-700 truncate">{t('batch.label')}: {batch.bname}</span>
+                  {batch.bstatus === 2 && (
+                    <span className="text-[9px] bg-yellow-105 text-yellow-600 border border-yellow-200 font-bold px-1 py-0.5 rounded uppercase shrink-0">
+                      转运待收 / Pending Transfer
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-mono">
                   ID: {batch.bid}
                 </span>
@@ -171,12 +212,15 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
                 <span className="text-slate-300">|</span>
                 <span className="font-bold text-slate-700">{t('batch.remaining')}: {formatWeight(batch.bcwei)}t</span>
               </div>
-              <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-3">
-                <span className="flex items-center gap-1">
+              <div className="text-[10px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="flex items-center gap-1 shrink-0">
                   <Calendar size={10} /> {formatDate(batch.bdate)}
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 shrink-0">
                   <Truck size={10} /> {batch.bcli}
+                </span>
+                <span className="flex items-center gap-1 shrink-0 bg-slate-50 text-slate-500 border border-slate-100 px-1 py-0.5 rounded">
+                  <Home size={10} className="text-indigo-500 shrink-0" /> {getWarehouseLabel(batch.bware)}
                 </span>
               </div>
               {batch.bmemo && (
@@ -421,10 +465,17 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
   const handleConfirm = async () => {
     const w = parseFloat(weight);
     if (isNaN(w) || isWeightExceeded(w, batch.bowei)) return;
+    
+    const extraUpdates: any = {};
+    if (batch.bstatus === 2 && status !== 2) {
+      extraUpdates.bdate = new Date().toISOString().split('T')[0];
+    }
+
     await dataService.updateBatch(bid, { 
       bcwei: w,
       bstatus: status,
-      bmemo: memo
+      bmemo: memo,
+      ...extraUpdates
     });
     onClose();
   };
@@ -434,11 +485,11 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
       <div className="space-y-4">
         <div>
           <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.status')}</label>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <button 
               onClick={() => setStatus(1)}
               className={cn(
-                "flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all",
+                "p-2.5 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all",
                 status === 1 ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-100 text-slate-400"
               )}
             >
@@ -450,7 +501,7 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
             <button 
               onClick={() => setStatus(0)}
               className={cn(
-                "flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all",
+                "p-2.5 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all",
                 status === 0 ? "border-red-500 bg-red-50 text-red-700" : "border-slate-100 text-slate-400"
               )}
             >
@@ -459,8 +510,41 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
                 <span className="text-xs font-bold">{t('batch.not_available')}</span>
               </div>
             </button>
+            <button 
+              onClick={() => setStatus(2)}
+              className={cn(
+                "p-2.5 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all",
+                status === 2 ? "border-yellow-500 bg-yellow-50 text-yellow-750" : "border-slate-100 text-slate-400"
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-[#facc15]" />
+                <span className="text-xs font-bold">{t('batch.status.transfer')}</span>
+              </div>
+            </button>
           </div>
         </div>
+
+        {batch.bstatus === 2 && (
+          <div className="bg-yellow-50 border border-yellow-200 p-3.5 rounded-xl space-y-2">
+            <div className="text-xs font-bold text-yellow-800">转运签收确认 / Action Required</div>
+            <p className="text-[10px] text-yellow-700 leading-relaxed">
+              该货物批次自其它货仓装车起运，当前正等待目的货仓核实卸货录入。
+            </p>
+            <button
+              onClick={async () => {
+                await dataService.updateBatch(bid, { 
+                  bstatus: 1, 
+                  bdate: new Date().toISOString().split('T')[0] 
+                });
+                onClose();
+              }}
+              className="w-full bg-emerald-500 hover:bg-emerald-605 text-white py-2 px-3 rounded-xl text-xs font-bold transition-all shadow flex items-center justify-center gap-1 cursor-pointer"
+            >
+              ✓ 签收并放行（登记进库）
+            </button>
+          </div>
+        )}
 
         <div>
           <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.remaining')} (t)</label>
