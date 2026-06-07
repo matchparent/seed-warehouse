@@ -155,8 +155,15 @@ function OrderCard({ order, t, destName, typeName, statusName, varieties, curren
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3"
-      onClick={onClick}
+      className={cn(
+        "bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3 transition-all",
+        order.status < OrderStatus.FULL_PAID ? "cursor-pointer hover:border-slate-200 hover:shadow-md" : ""
+      )}
+      onClick={() => {
+        if (order.status < OrderStatus.FULL_PAID) {
+          onClick();
+        }
+      }}
     >
       <div className="flex justify-between items-start">
         <div className="space-y-0.5">
@@ -330,6 +337,33 @@ function OrderDetailsModal({ order, onClose, onUpdate }: { order: Order, onClose
       if (order.status === OrderStatus.INTENTIONAL) {
         if (!conId) { alert('Please enter contract ID'); return; }
         const fileName = file ? `${Date.now()}_${file.name}` : order.oconfn;
+
+        let fileDataUrl = '';
+        if (file) {
+          fileDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        }
+
+        const isMysql = dataService.getMode() === 'mysql';
+
+        if (file && fileDataUrl) {
+          if (isMysql) {
+            const base64Data = fileDataUrl.includes('base64,') ? fileDataUrl.split('base64,')[1] : '';
+            await fetch('/api/contracts/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fileName,
+                fileData: base64Data
+              })
+            });
+          }
+        }
+
         const newStatus = OrderStatus.SIGNED;
         const newDateRecord = `${newStatus}-${formatSimpleDate()}`;
         const newOcDate = order.ocdate ? `${order.ocdate},${newDateRecord}` : newDateRecord;
@@ -338,7 +372,8 @@ function OrderDetailsModal({ order, onClose, onUpdate }: { order: Order, onClose
           status: newStatus, 
           oconid: conId, 
           oconfn: fileName,
-          ocdate: newOcDate
+          ocdate: newOcDate,
+          ...(fileDataUrl && !isMysql ? { ocontract_data: fileDataUrl } : {})
         });
       } else if (order.status === OrderStatus.SIGNED) {
         if (!receivedAmount || isNaN(Number(receivedAmount)) || Number(receivedAmount) < 0) { 
@@ -581,8 +616,29 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
   };
 
   const handleDownload = () => {
+    if (!order.oconfn) return;
     if (confirm(t('confirm.download_contract'))) {
-      alert('Download started...');
+      const isMysql = dataService.getMode() === 'mysql';
+      if (isMysql) {
+        const link = document.createElement('a');
+        link.href = `/api/contracts/download/${encodeURIComponent(order.oconfn)}`;
+        link.download = order.oconfn;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Dexie mode
+        if (order.ocontract_data) {
+          const link = document.createElement('a');
+          link.href = order.ocontract_data;
+          link.download = order.oconfn;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          alert('Local contract file not found in storage.');
+        }
+      }
     }
   };
 

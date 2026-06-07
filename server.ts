@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import knex from "knex";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ async function startServer() {
     next();
   });
 
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
 
   // Database initialization
   const db = knex({
@@ -317,6 +318,43 @@ async function startServer() {
       const data = await db('tab_batch').orderBy('bdate', 'desc');
       res.json(data);
     } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // Upload and Download contract files
+  app.post("/api/contracts/upload", async (req, res) => {
+    const { fileName, fileData } = req.body;
+    if (!fileName || !fileData) {
+      return res.status(400).json({ error: "Missing fileName or fileData" });
+    }
+    try {
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      const filePath = path.join(uploadsDir, fileName);
+      const buffer = Buffer.from(fileData, 'base64');
+      fs.writeFileSync(filePath, buffer);
+      res.json({ success: true, filePath: `/uploads/${fileName}` });
+    } catch (err) {
+      console.error("Error writing uploaded file:", err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.get("/api/contracts/download/:fileName", async (req, res) => {
+    const { fileName } = req.params;
+    try {
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      const filePath = path.join(uploadsDir, fileName);
+      if (fs.existsSync(filePath)) {
+        res.download(filePath, fileName);
+      } else {
+        res.status(404).json({ error: `File not found on server: ${fileName}` });
+      }
+    } catch (err) {
+      console.error("Error downloading file:", err);
       res.status(500).json({ error: String(err) });
     }
   });

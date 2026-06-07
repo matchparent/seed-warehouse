@@ -69,6 +69,7 @@ export interface Order {
   ossgi: string; // Ordered goods "vid/qty,vid/qty"
   oconid?: string; // Contract ID
   oconfn?: string; // Contract filename
+  ocontract_data?: string; // Base64 data URL for local storage
   oarp?: string; // Actual received (实收货款)
   oard?: string; // Deposit received (实收定金)
   oarr?: string; // Balance received (实收尾款)
