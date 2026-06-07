@@ -328,11 +328,12 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  app.listen(PORT, "0.0.0.0", async () => {
+  const server = app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on http://localhost:${PORT}`);
     await initMySQL();
   });
+  server.keepAliveTimeout = 0;
+  server.headersTimeout = 0;
 }
 
 startServer();
