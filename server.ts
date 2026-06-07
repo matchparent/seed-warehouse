@@ -33,7 +33,17 @@ async function startServer() {
     useNullAsDefault: true
   });
 
-  const dbMode = process.env.DB_HOST ? 'mysql' : 'dexie';
+  const dbHost = process.env.DB_HOST;
+  const dbMode = (dbHost && dbHost !== 'undefined' && dbHost !== 'null' && dbHost.trim() !== '') ? 'mysql' : 'dexie';
+
+  console.log('================================================');
+  console.log(`[Server Startup] NODE_ENV: "${process.env.NODE_ENV}"`);
+  console.log(`[Server Startup] DB_HOST: "${process.env.DB_HOST}"`);
+  console.log(`[Server Startup] DB_PORT: "${process.env.DB_PORT}"`);
+  console.log(`[Server Startup] DB_USER: "${process.env.DB_USER}"`);
+  console.log(`[Server Startup] DB_NAME: "${process.env.DB_NAME}"`);
+  console.log(`[Server Startup] Calculated dbMode: "${dbMode}"`);
+  console.log('================================================');
 
   // Check and create tables if MySQL is accessible
   async function initMySQL() {

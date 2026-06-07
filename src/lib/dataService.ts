@@ -14,9 +14,11 @@ class DataService {
     try {
       const res = await fetch('/api/config');
       const data = await res.json();
+      console.log('[Client Database Connection Debug] Fetched info from server:', data);
       this.mode = data.dbMode || 'dexie';
+      console.log('[Client Database Connection Debug] Active mode is:', this.mode);
     } catch (e) {
-      console.error('Failed to fetch DB mode, defaulting to dexie', e);
+      console.error('[Client Database Connection Debug] Failed to fetch DB mode, defaulting to dexie', e);
       this.mode = 'dexie';
     }
     this.initialized = true;
