@@ -4,13 +4,16 @@
  */
 
 import Dexie, { type Table } from 'dexie';
-import { Variety, Destination, Batch, SendingRecord } from './types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType } from './types';
 
 export class CottonSeedDB extends Dexie {
   tab_variaty!: Table<Variety, number>;
   tab_destination!: Table<Destination, number>;
   tab_batch!: Table<Batch, number>;
   tab_sending_record!: Table<SendingRecord, number>;
+  tab_order_status!: Table<OrderStatusType, number>;
+  tab_order_custom!: Table<OrderCustomType, number>;
+  tab_orders!: Table<Order, number>;
   tab_user!: Table<{ uid?: number, spellname: string, key: string }, number>;
   tab_op_record!: Table<{ orid?: number, spellname: string, desc: string, optime: string }, number>;
 
@@ -20,7 +23,10 @@ export class CottonSeedDB extends Dexie {
       tab_variaty: '++vid, vname',
       tab_destination: '++did, dname',
       tab_batch: '++bid, bname, bvid, bstatus, bdate',
-      tab_sending_record: '++sid, sstate, sdate, splate, sdest',
+      tab_sending_record: '++sid, sstate, sdate, splate, sdest, soid',
+      tab_order_status: '++osid, oscname',
+      tab_order_custom: '++ocid, occname',
+      tab_orders: '++oid, status, ocdate, odest, octype',
       tab_user: '++uid, spellname, key',
       tab_op_record: '++orid, spellname, optime'
     });
@@ -66,6 +72,29 @@ export async function initDB() {
         spellname: 'BianJiang',
         key: 'U2FsdGVkX18mX9TVixXl9qnwMi9z2Mc6C1oaKzLc8Ow='
       });
+    }
+
+    const orderStatusCount = await db.tab_order_status.count();
+    if (orderStatusCount === 0) {
+      await db.tab_order_status.bulkPut([
+        { osid: 1, oscname: '有意愿', osuname: 'Iroda', osename: 'Intentional' },
+        { osid: 2, oscname: '已签约', osuname: 'Shartnoma imzolanadi', osename: 'Signed' },
+        { osid: 3, oscname: '已付定金', osuname: 'Zakalat to\'langan', osename: 'Deposit Paid' },
+        { osid: 4, oscname: '已付全款', osuname: 'To\'liq to\'langan', osename: 'Full Paid' },
+        { osid: 5, oscname: '已完成', osuname: 'Tugatildi', osename: 'Completed' },
+        { osid: 6, oscname: '已退款', osuname: 'Qaytarilgan', osename: 'Refunded' },
+        { osid: 7, oscname: '已删除', osuname: 'O\'chirildi', osename: 'Deleted' }
+      ]);
+    }
+
+    const orderCustomCount = await db.tab_order_custom.count();
+    if (orderCustomCount === 0) {
+      await db.tab_order_custom.bulkPut([
+        { ocid: 1, occname: '政府', ocuname: 'Hukumat', ocename: 'Government' },
+        { ocid: 2, occname: 'Cluster', ocuname: 'Klaster', ocename: 'Cluster' },
+        { ocid: 3, occname: 'AKIS', ocuname: 'AKIS', ocename: 'AKIS' },
+        { ocid: 4, occname: '散户', ocuname: 'Xususiy fermerlar', ocename: 'Private Farmer' }
+      ]);
     }
   } finally {
     isInitializing = false;

@@ -5,9 +5,9 @@
 
 import React, { useState } from 'react';
 import { ArrowLeft, Plus, Trash2, Truck, MapPin, Phone, FileText, Calendar } from 'lucide-react';
-import { ShipmentState } from '../types';
+import { ShipmentState, OrderStatus } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { useVarieties, useDestinations, dataService } from '../lib/dataService';
+import { useVarieties, useDestinations, dataService, useOrders } from '../lib/dataService';
 import { safeToFixed } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
 
@@ -15,10 +15,15 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
   const { t } = useI18n();
   const varieties = useVarieties();
   const destinations = useDestinations();
+  const orders = useOrders();
+
+  const activeOrders = React.useMemo(() => {
+    return orders?.filter(o => o.status === OrderStatus.FULL_PAID) || [];
+  }, [orders]);
   
   const [formData, setFormData] = useState({
     splate: '',
-    sdest: '',
+    soid: '', // Selected order's oid
     sdate: new Date().toISOString().split('T')[0]
   });
 
@@ -26,9 +31,81 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
   const [showItemModal, setShowItemModal] = useState(false);
   const [newItem, setNewItem] = useState({ vid: '', weight: '' });
 
+  const activeOrder = React.useMemo(() => {
+    return activeOrders.find(o => o.oid === parseInt(formData.soid));
+  }, [activeOrders, formData.soid]);
+
+  // Parse order variety demands
+  const orderedMap = React.useMemo(() => {
+    if (!activeOrder) return {};
+    const map: { [vid: number]: number } = {};
+    activeOrder.ossgi.split(',').forEach(item => {
+      const parts = item.split('/');
+      if (parts.length === 2) {
+        const vid = parseInt(parts[0]);
+        const qty = parseFloat(parts[1]);
+        if (!isNaN(vid) && !isNaN(qty)) map[vid] = qty;
+      }
+    });
+    return map;
+  }, [activeOrder]);
+
+  const sentMap = React.useMemo(() => {
+    if (!activeOrder) return {};
+    const map: { [vid: number]: number } = {};
+    if (activeOrder.ogsented) {
+      activeOrder.ogsented.split(',').forEach(item => {
+        const parts = item.split('/');
+        if (parts.length === 2) {
+          const vid = parseInt(parts[0]);
+          const qty = parseFloat(parts[1]);
+          if (!isNaN(vid) && !isNaN(qty)) map[vid] = qty;
+        }
+      });
+    }
+    return map;
+  }, [activeOrder]);
+
+  const currentlyPlannedMap = React.useMemo(() => {
+    const map: { [vid: number]: number } = {};
+    plannedItems.forEach(item => {
+      map[item.vid] = (map[item.vid] || 0) + item.weight;
+    });
+    return map;
+  }, [plannedItems]);
+
+  const filteredVarieties = React.useMemo(() => {
+    if (!activeOrder) return [];
+    const keys = Object.keys(orderedMap).map(Number);
+    return varieties?.filter(v => keys.includes(v.vid)) || [];
+  }, [varieties, activeOrder, orderedMap]);
+
+  const handleOrderChange = (soid: string) => {
+    setFormData(prev => ({ ...prev, soid }));
+    setPlannedItems([]); // Reset items because the order demands differ
+  };
+
   const handleAddItem = () => {
     if (!newItem.vid || !newItem.weight) return;
-    setPlannedItems([...plannedItems, { vid: parseInt(newItem.vid), weight: parseFloat(newItem.weight) }]);
+    const vid = parseInt(newItem.vid);
+    const weight = parseFloat(newItem.weight);
+    if (isNaN(weight) || weight <= 0) {
+      alert('请输入有效的重量');
+      return;
+    }
+    const ord = orderedMap[vid] || 0;
+    if (ord === 0) {
+      alert('该品种不在此订单的需求内！');
+      return;
+    }
+    const snt = sentMap[vid] || 0;
+    const plnd = currentlyPlannedMap[vid] || 0;
+    const rem = ord - snt - plnd;
+    if (weight > rem + 0.0001) {
+      alert(`超出剩余需要发货的量！该品种当前最大剩余发货量为 ${safeToFixed(rem, 3)} 吨`);
+      return;
+    }
+    setPlannedItems([...plannedItems, { vid, weight }]);
     setNewItem({ vid: '', weight: '' });
     setShowItemModal(false);
   };
@@ -37,18 +114,22 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
     setPlannedItems(plannedItems.filter((_, i) => i !== index));
   };
 
-  const isValid = formData.splate && formData.sdest && plannedItems.length > 0;
+  const isValid = formData.splate && formData.soid && plannedItems.length > 0;
 
   const handleCreate = async () => {
     if (!isValid) return;
     
+    const order = activeOrders.find(o => o.oid === parseInt(formData.soid));
+    if (!order) return;
+
     const spinfo = plannedItems.map(item => `${item.vid}/${item.weight}`).join(',');
     
     const id = await dataService.addSendingRecord({
       sstate: ShipmentState.NEW,
       splate: formData.splate,
       sdrpn: '',
-      sdest: parseInt(formData.sdest),
+      sdest: order.odest, // Put order's destination Info inside sdest
+      soid: order.oid,    // ForeignKey connect
       sdate: formData.sdate,
       spinfo: spinfo,
       sainfo: '',
@@ -82,16 +163,21 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
             />
           </InputGroup>
 
-          <InputGroup label={t('form.destination')} icon={<MapPin size={18} />}>
+          <InputGroup label={t('order.title')} icon={<FileText size={18} />}>
             <select 
-              value={formData.sdest}
-              onChange={e => setFormData({...formData, sdest: e.target.value})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
+              value={formData.soid}
+              onChange={e => handleOrderChange(e.target.value)}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-bold"
             >
-              <option value="">{t('form.select_destination')}</option>
-              {destinations?.map(d => (
-                <option key={d.did} value={d.did}>{d.dname}</option>
-              ))}
+              <option value="">{t('form.select_order') || '选择分属订单'}</option>
+              {activeOrders?.map(o => {
+                const destName = destinations?.find(d => d.did === o.odest)?.dname || `ID ${o.odest}`;
+                return (
+                  <option key={o.oid} value={o.oid}>
+                    {destName} - {o.ocname}
+                  </option>
+                );
+              })}
             </select>
           </InputGroup>
 
@@ -101,12 +187,49 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
                 <PackageIcon size={18} /> {t('shipment.planned')}
               </label>
               <button 
-                onClick={() => setShowItemModal(true)}
+                onClick={() => {
+                  if (!formData.soid) {
+                    alert('请先选择订单！');
+                    return;
+                  }
+                  setShowItemModal(true);
+                }}
                 className="text-xs font-bold text-emerald-600 flex items-center gap-1"
               >
                 <Plus size={14} /> {t('action.add')}
               </button>
             </div>
+
+            {activeOrder && (
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-0.5">
+                  {t('order.variety_qty') || '订单品种需求'}
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {Object.entries(orderedMap).map(([vidStr, reqQty]) => {
+                    const vid = parseInt(vidStr);
+                    const vname = varieties?.find(v => v.vid === vid)?.vname || `ID ${vid}`;
+                    const snt = sentMap[vid] || 0;
+                    const plnd = currentlyPlannedMap[vid] || 0;
+                    const rem = reqQty - snt - plnd;
+                    return (
+                      <div key={vid} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-100 shadow-sm text-xs gap-1">
+                        <span className="font-bold text-slate-700">{vname}</span>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500">
+                          <span>需求: <strong className="text-slate-800 font-bold">{reqQty}t</strong></span>
+                          <span>已发: <strong className="text-slate-800 font-medium">{snt}t</strong></span>
+                          {plnd > 0 && (
+                            <span>本次计划: <strong className="text-emerald-600 font-bold">{safeToFixed(plnd, 3)}t</strong></span>
+                          )}
+                          <span>剩余所需: <strong className={rem > 0.001 ? "text-amber-600 font-bold" : "text-slate-400 font-medium"}>{safeToFixed(rem > 0 ? rem : 0, 3)}t</strong></span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               {plannedItems.map((item, i) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
@@ -171,9 +294,17 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                 >
                   <option value="">{t('form.select_variety')}</option>
-                  {varieties?.map(v => (
-                    <option key={v.vid} value={v.vid}>{v.vname}</option>
-                  ))}
+                  {filteredVarieties?.map(v => {
+                    const ord = orderedMap[v.vid] || 0;
+                    const snt = sentMap[v.vid] || 0;
+                    const plnd = currentlyPlannedMap[v.vid] || 0;
+                    const rem = ord - snt - plnd;
+                    return (
+                      <option key={v.vid} value={v.vid}>
+                        {v.vname} (Req: {ord}t, Rem: {safeToFixed(rem > 0 ? rem : 0, 3)}t)
+                      </option>
+                    );
+                  })}
                 </select>
                 <input 
                   type="number" 

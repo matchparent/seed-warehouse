@@ -22,7 +22,8 @@ import {
   Clock,
   ArrowLeft,
   Search,
-  Download
+  Download,
+  ClipboardCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatWeight, formatDate, formatDateTime } from './lib/utils';
@@ -31,6 +32,7 @@ import * as XLSX from 'xlsx';
 
 // --- Sub-pages ---
 import AddBatchPage from './components/AddBatchPage';
+import AddOrderPage from './components/AddOrderPage';
 import CreateShipmentPage from './components/CreateShipmentPage';
 import AllocationPage from './components/AllocationPage';
 import InspectionPage from './components/InspectionPage';
@@ -40,17 +42,21 @@ import { useI18n } from './lib/i18n';
 
 // --- Fragments ---
 import BatchListFragment from './components/BatchListFragment';
+import OrderListFragment from './components/OrderListFragment';
 import ShipmentListFragment from './components/ShipmentListFragment';
 import StatisticsFragment from './components/StatisticsFragment';
 import OtherFragment from './components/OtherFragment';
 
-type View = 'main' | 'add-batch' | 'create-shipment' | 'allocation' | 'inspection';
+import { Order, OrderStatus } from './types';
+
+type View = 'main' | 'add-batch' | 'create-shipment' | 'allocation' | 'inspection' | 'add-order';
 
 export default function App() {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState(0);
   const [currentView, setCurrentView] = useState<View>('main');
   const [selectedShipmentId, setSelectedShipmentId] = useState<number | null>(null);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('auth_user'));
 
@@ -59,12 +65,15 @@ export default function App() {
       await dataService.init();
       await initDB();
       setIsInitialized(true);
+      if (dataService.getMode() === 'dexie') {
+        setIsLoggedIn(true);
+      }
     }
     start();
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || dataService.getMode() === 'dexie') return;
 
     const checkAuth = async () => {
       const userStr = localStorage.getItem('auth_user');
@@ -136,6 +145,16 @@ export default function App() {
           onBack={() => setCurrentView('main')} 
           onFinished={() => setCurrentView('main')} 
         />;
+      case 'add-order':
+        return (
+          <AddOrderPage 
+            editOrder={editingOrder}
+            onBack={() => {
+              setEditingOrder(null);
+              setCurrentView('main');
+            }} 
+          />
+        );
       default:
         return (
           <div className="flex flex-col h-screen bg-slate-50">
@@ -149,8 +168,20 @@ export default function App() {
                   transition={{ duration: 0.2 }}
                   className="p-4"
                 >
-                  {activeTab === 0 && <BatchListFragment onAdd={() => setCurrentView('add-batch')} />}
-                  {activeTab === 1 && <ShipmentListFragment 
+                  {activeTab === 0 && (
+                    <OrderListFragment 
+                      onAdd={() => {
+                        setEditingOrder(null);
+                        setCurrentView('add-order');
+                      }} 
+                      onEditOrder={(order) => {
+                        setEditingOrder(order);
+                        setCurrentView('add-order');
+                      }}
+                    />
+                  )}
+                  {activeTab === 1 && <BatchListFragment onAdd={() => setCurrentView('add-batch')} />}
+                  {activeTab === 2 && <ShipmentListFragment 
                     onAdd={() => setCurrentView('create-shipment')} 
                     onEdit={(id, state) => {
                       setSelectedShipmentId(id);
@@ -158,17 +189,18 @@ export default function App() {
                       if (state === ShipmentState.ALLOCATED) setCurrentView('inspection');
                     }}
                   />}
-                  {activeTab === 2 && <StatisticsFragment />}
-                  {activeTab === 3 && <OtherFragment />}
+                  {activeTab === 3 && <StatisticsFragment />}
+                  {activeTab === 4 && <OtherFragment />}
                 </motion.div>
               </AnimatePresence>
             </main>
 
             <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-2 py-2 flex justify-around items-center shadow-lg z-50">
-              <TabButton active={activeTab === 0} onClick={() => setActiveTab(0)} icon={<Package size={20} />} label={t('nav.batches')} />
-              <TabButton active={activeTab === 1} onClick={() => setActiveTab(1)} icon={<Truck size={20} />} label={t('nav.shipments')} />
-              <TabButton active={activeTab === 2} onClick={() => setActiveTab(2)} icon={<BarChart3 size={20} />} label={t('nav.stats')} />
-              <TabButton active={activeTab === 3} onClick={() => setActiveTab(3)} icon={<Settings size={20} />} label={t('nav.other')} />
+              <TabButton active={activeTab === 0} onClick={() => setActiveTab(0)} icon={<ClipboardCheck size={20} />} label={t('nav.orders')} />
+              <TabButton active={activeTab === 1} onClick={() => setActiveTab(1)} icon={<Package size={20} />} label={t('nav.batches')} />
+              <TabButton active={activeTab === 2} onClick={() => setActiveTab(2)} icon={<Truck size={20} />} label={t('nav.shipments')} />
+              <TabButton active={activeTab === 3} onClick={() => setActiveTab(3)} icon={<BarChart3 size={20} />} label={t('nav.stats')} />
+              <TabButton active={activeTab === 4} onClick={() => setActiveTab(4)} icon={<Settings size={20} />} label={t('nav.other')} />
             </nav>
           </div>
         );

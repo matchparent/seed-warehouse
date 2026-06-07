@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { ArrowLeft, CheckCircle2, Truck, MapPin, Phone, Calendar, Info, Package, FileText } from 'lucide-react';
-import { ShipmentState } from '../types';
+import { ShipmentState, OrderStatus, Order } from '../types';
 import { formatWeight, formatDate, subWeights } from '../lib/utils';
 import { motion } from 'motion/react';
 import { useSendingRecord, useVarieties, useDestinations, useBatches, dataService } from '../lib/dataService';
@@ -57,6 +57,88 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
       smemo: memo,
       sdrpn: phone
     });
+
+    // 3. Update associated order's ogsented & complete check
+    const record = await dataService.getSendingRecord(shipmentId);
+    if (record && record.soid) {
+      const orders = await dataService.getOrders(true);
+      const order = orders.find(o => o.oid === record.soid);
+      if (order) {
+        // Parse current shipment dispatched weights from spinfo
+        const shipmentDispatched: { [vid: number]: number } = {};
+        if (record.spinfo) {
+          record.spinfo.split(',').forEach(item => {
+            const parts = item.split('/');
+            if (parts.length === 2) {
+              const vid = parseInt(parts[0]);
+              const weight = parseFloat(parts[1]);
+              if (!isNaN(vid) && !isNaN(weight)) {
+                shipmentDispatched[vid] = (shipmentDispatched[vid] || 0) + weight;
+              }
+            }
+          });
+        }
+
+        // Parse order's ogsented
+        const orderSent: { [vid: number]: number } = {};
+        if (order.ogsented) {
+          order.ogsented.split(',').forEach(item => {
+            const parts = item.split('/');
+            if (parts.length === 2) {
+              const vid = parseInt(parts[0]);
+              const qty = parseFloat(parts[1]);
+              if (!isNaN(vid) && !isNaN(qty)) {
+                orderSent[vid] = qty;
+              }
+            }
+          });
+        }
+
+        // Add current shipment weights to orderSent
+        Object.entries(shipmentDispatched).forEach(([vidStr, weight]) => {
+          const vid = parseInt(vidStr);
+          orderSent[vid] = (orderSent[vid] || 0) + weight;
+        });
+
+        const updatedOgsented = Object.entries(orderSent)
+          .map(([vid, qty]) => `${vid}/${qty}`)
+          .join(',');
+
+        // Check if all varieties are fully shipped
+        const orderDemands: { [vid: number]: number } = {};
+        if (order.ossgi) {
+          order.ossgi.split(',').forEach(item => {
+            const parts = item.split('/');
+            if (parts.length === 2) {
+              const vid = parseInt(parts[0]);
+              const qty = parseFloat(parts[1]);
+              if (!isNaN(vid) && !isNaN(qty)) {
+                orderDemands[vid] = qty;
+              }
+            }
+          });
+        }
+
+        let allMet = true;
+        Object.entries(orderDemands).forEach(([vidStr, targetQty]) => {
+          const vid = parseInt(vidStr);
+          const sentQty = orderSent[vid] || 0;
+          if (sentQty < targetQty - 0.001) {
+            allMet = false;
+          }
+        });
+
+        const updates: Partial<Order> = {
+          ogsented: updatedOgsented
+        };
+
+        if (allMet) {
+          updates.status = OrderStatus.COMPLETED;
+        }
+
+        await dataService.updateOrder(order.oid!, updates);
+      }
+    }
     
     onFinished();
   };

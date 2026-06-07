@@ -70,12 +70,20 @@ async function startServer() {
           table.string('sdate').notNullable();
           table.string('splate').notNullable();
           table.integer('sdest').notNullable();
+          table.integer('soid');
           table.string('sdrpn');
           table.string('sftime');
           table.text('spinfo');
           table.text('sainfo');
           table.text('smemo');
         });
+      } else {
+        const columnsRecord = await db('tab_sending_record').columnInfo();
+        if (!columnsRecord.soid) {
+          await db.schema.table('tab_sending_record', (table) => {
+            table.integer('soid');
+          });
+        }
       }
 
       const hasRecordLog = await db.schema.hasTable('tab_op_record');
@@ -102,6 +110,59 @@ async function startServer() {
         });
       }
 
+      const hasOrderStatus = await db.schema.hasTable('tab_order_status');
+      if (!hasOrderStatus) {
+        await db.schema.createTable('tab_order_status', (table) => {
+          table.increments('osid').primary();
+          table.string('oscname').notNullable();
+          table.string('osuname').notNullable();
+          table.string('osename').notNullable();
+        });
+      }
+
+      const hasOrderCustom = await db.schema.hasTable('tab_order_custom');
+      if (!hasOrderCustom) {
+        await db.schema.createTable('tab_order_custom', (table) => {
+          table.increments('ocid').primary();
+          table.string('occname').notNullable();
+          table.string('ocuname').notNullable();
+          table.string('ocename').notNullable();
+        });
+      }
+
+      const hasOrders = await db.schema.hasTable('tab_orders');
+      if (!hasOrders) {
+        await db.schema.createTable('tab_orders', (table) => {
+          table.increments('oid').primary();
+          table.string('ocdate');
+          table.integer('status').notNullable();
+          table.integer('odest').notNullable();
+          table.integer('octype').notNullable();
+          table.string('ocname');
+          table.string('ocphone');
+          table.string('otr');
+          table.integer('otrc').defaultTo(1);
+          table.text('ossgi');
+          table.string('oconid');
+          table.string('oconfn');
+          table.string('oarp');
+          table.string('oard'); // Deposit
+          table.string('oarr'); // Balance
+          table.integer('oarpc').defaultTo(1);
+          table.text('ogsented');
+          table.text('omemo');
+        });
+      } else {
+        // Migration check for oard, oarr
+        const columns = await db('tab_orders').columnInfo();
+        if (!columns.oard) {
+           await db.schema.table('tab_orders', (table) => {
+             table.string('oard');
+             table.string('oarr');
+           });
+        }
+      }
+
       const variatyCount = await db('tab_variaty').count('vid as count').first();
       if ((variatyCount as any).count === 0) {
         await db('tab_variaty').insert([
@@ -122,6 +183,29 @@ async function startServer() {
         await db('tab_destination').insert(
           uzbekStates.map((name, i) => ({ did: i + 1, dname: name }))
         );
+      }
+
+      const orderStatusCount = await db('tab_order_status').count('osid as count').first();
+      if ((orderStatusCount as any).count === 0) {
+        await db('tab_order_status').insert([
+          { osid: 1, oscname: '有意愿', osuname: 'Iroda', osename: 'Intentional' },
+          { osid: 2, oscname: '已签约', osuname: 'Shartnoma imzolanadi', osename: 'Signed' },
+          { osid: 3, oscname: '已付定金', osuname: 'Zakalat to\'langan', osename: 'Deposit Paid' },
+          { osid: 4, oscname: '已付全款', osuname: 'To\'liq to\'langan', osename: 'Full Paid' },
+          { osid: 5, oscname: '已完成', osuname: 'Tugatildi', osename: 'Completed' },
+          { osid: 6, oscname: '已退款', osuname: 'Qaytarilgan', osename: 'Refunded' },
+          { osid: 7, oscname: '已删除', osuname: 'O\'chirildi', osename: 'Deleted' }
+        ]);
+      }
+
+      const orderCustomCount = await db('tab_order_custom').count('ocid as count').first();
+      if ((orderCustomCount as any).count === 0) {
+        await db('tab_order_custom').insert([
+          { ocid: 1, occname: '政府', ocuname: 'Hukumat', ocename: 'Government' },
+          { ocid: 2, occname: 'Cluster', ocuname: 'Klaster', ocename: 'Cluster' },
+          { ocid: 3, occname: 'AKIS', ocuname: 'AKIS', ocename: 'AKIS' },
+          { ocid: 4, occname: '散户', ocuname: 'Xususiy fermerlar', ocename: 'Private Farmer' }
+        ]);
       }
       console.log('MySQL schemas checked/initialized.');
     } catch (err) {
@@ -192,6 +276,9 @@ async function startServer() {
   setupTableRoutes('tab_batch', 'bid');
   setupTableRoutes('tab_sending_record', 'sid');
   setupTableRoutes('tab_op_record', 'orid');
+  setupTableRoutes('tab_orders', 'oid');
+  setupTableRoutes('tab_order_status', 'osid');
+  setupTableRoutes('tab_order_custom', 'ocid');
 
   app.post("/api/auth/login", async (req, res) => {
     const { spellname, key } = req.body;

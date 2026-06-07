@@ -19,7 +19,7 @@ import {
   Edit2
 } from 'lucide-react';
 import { cn, formatDate, safeToFixed } from '../lib/utils';
-import { ShipmentState } from '../types';
+import { ShipmentState, OrderStatus, Order } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSendingRecords, useVarieties, useDestinations, useBatches, useBatch, useSendingRecord, dataService } from '../lib/dataService';
 import { useI18n } from '../lib/i18n';
@@ -334,6 +334,65 @@ function WithdrawShipmentModal({ sid, onClose }: { sid: number | null, onClose: 
       await dataService.updateBatch(alloc.bid, { bcwei: alloc.current + alloc.weight });
     }
     await dataService.updateSendingRecord(sid, { sstate: ShipmentState.WITHDRAWN });
+
+    if (record.soid) {
+      const orders = await dataService.getOrders(true);
+      const order = orders.find(o => o.oid === record.soid);
+      if (order) {
+        // Parse current sending record's spinfo (dispatched quantities)
+        const shipmentDispatched: { [vid: number]: number } = {};
+        if (record.spinfo) {
+          record.spinfo.split(',').forEach(item => {
+            const parts = item.split('/');
+            if (parts.length === 2) {
+              const vid = parseInt(parts[0]);
+              const weight = parseFloat(parts[1]);
+              if (!isNaN(vid) && !isNaN(weight)) {
+                shipmentDispatched[vid] = (shipmentDispatched[vid] || 0) + weight;
+              }
+            }
+          });
+        }
+
+        // Parse order's ogsented
+        const orderSent: { [vid: number]: number } = {};
+        if (order.ogsented) {
+          order.ogsented.split(',').forEach(item => {
+            const parts = item.split('/');
+            if (parts.length === 2) {
+              const vid = parseInt(parts[0]);
+              const qty = parseFloat(parts[1]);
+              if (!isNaN(vid) && !isNaN(qty)) {
+                orderSent[vid] = qty;
+              }
+            }
+          });
+        }
+
+        // Deduct withdrawn weights
+        Object.entries(shipmentDispatched).forEach(([vidStr, weight]) => {
+          const vid = parseInt(vidStr);
+          if (orderSent[vid]) {
+            orderSent[vid] = orderSent[vid] - weight;
+            if (orderSent[vid] < 0) orderSent[vid] = 0;
+          }
+        });
+
+        const updatedOgsented = Object.entries(orderSent)
+          .map(([vid, qty]) => `${vid}/${qty}`)
+          .join(',');
+
+        const updates: Partial<Order> = {
+          ogsented: updatedOgsented
+        };
+        if (order.status === OrderStatus.COMPLETED) {
+          updates.status = OrderStatus.FULL_PAID;
+        }
+
+        await dataService.updateOrder(order.oid!, updates);
+      }
+    }
+
     onClose();
   };
 

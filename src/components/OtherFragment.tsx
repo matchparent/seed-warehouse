@@ -163,18 +163,20 @@ export default function OtherFragment() {
         </button>
       </div>
 
-      <div className="grid gap-3 pt-4 border-t border-slate-50">
-        <button 
-          onClick={() => {
-            localStorage.removeItem('auth_user');
-            window.location.reload();
-          }}
-          className="w-full py-4 bg-white border border-slate-100 text-red-500 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-2 hover:bg-red-50 transition-colors"
-        >
-          <ShieldCheck size={18} />
-          {t('other.logout')}
-        </button>
-      </div>
+      {dataService.getMode() !== 'dexie' && (
+        <div className="grid gap-3 pt-4 border-t border-slate-50">
+          <button 
+            onClick={() => {
+              localStorage.removeItem('auth_user');
+              window.location.reload();
+            }}
+            className="w-full py-4 bg-white border border-slate-100 text-red-500 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-2 hover:bg-red-50 transition-colors"
+          >
+            <ShieldCheck size={18} />
+            {t('other.logout')}
+          </button>
+        </div>
+      )}
 
       <AnimatePresence>
         {showSQLConfirm && (

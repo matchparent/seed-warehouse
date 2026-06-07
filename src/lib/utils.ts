@@ -53,7 +53,21 @@ export function isWeightExceeded(weight: number | string, limit: number | string
 
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '-';
+  // If format is like "1-2026.05.22,2-2026.06.01", find the state 1 date
+  if (dateStr.includes('-')) {
+    const records = dateStr.split(',');
+    const firstRecord = records.find(r => r.startsWith('1-'));
+    if (firstRecord) return firstRecord.split('-')[1];
+    return records[0].split('-')[1] || '-';
+  }
   return dateStr.split('T')[0];
+}
+
+export function formatSimpleDate(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}.${m}.${d}`;
 }
 
 export function formatDateTime(dateStr: string): string {
@@ -66,6 +80,18 @@ export function formatDateTime(dateStr: string): string {
     hour: '2-digit',
     minute: '2-digit'
   });
+}
+
+export function getCurrencySymbol(otrc: number): string {
+  if (otrc === 2) return 'USD';
+  if (otrc === 3) return 'CNY';
+  return 'UZS';
+}
+
+export function getCurrencyShortSymbol(otrc: number): string {
+  if (otrc === 2) return '$';
+  if (otrc === 3) return '￥';
+  return 'UZS';
 }
 
 export async function copyToClipboard(text: string): Promise<boolean> {

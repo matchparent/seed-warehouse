@@ -15,17 +15,27 @@ import {
   AlertCircle,
   Calendar,
   Truck,
-  FileText
+  FileText,
+  Filter,
+  ArrowUpDown
 } from 'lucide-react';
 import { cn, formatWeight, formatDate, copyToClipboard, isWeightExceeded, safeToFixed } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBatches, useVarieties, useSendingRecords, useBatch, dataService } from '../lib/dataService';
 import { useI18n } from '../lib/i18n';
 
+type FilterType = 'all' | 'remaining' | 'no_remaining' | 'approved' | 'rejected' | string;
+type SortType = 'date_asc' | 'date_desc' | 'name_asc' | 'name_desc' | 'remaining_asc' | 'remaining_desc' | 'status_asc' | 'status_desc';
+
 export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
   const { t } = useI18n();
   const batches = useBatches();
   const varieties = useVarieties();
+  const [filterType, setFilterType] = useState<FilterType>('remaining');
+  const [sortBy, setSortBy] = useState<SortType>('date_asc');
+  
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [historyModal, setHistoryModal] = useState<number | null>(null);
   const [modifyModal, setModifyModal] = useState<number | null>(null);
@@ -33,6 +43,43 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
   const [copied, setCopied] = useState(false);
 
   const getVarietyName = (vid: number) => varieties?.find(v => v.vid === vid)?.vname || '未知';
+
+  const filteredAndSortedBatches = React.useMemo(() => {
+    if (!batches) return [];
+
+    let result = [...batches];
+
+    // Filter
+    if (filterType === 'remaining') {
+      result = result.filter(b => b.bcwei > 0);
+    } else if (filterType === 'no_remaining') {
+      result = result.filter(b => b.bcwei <= 0);
+    } else if (filterType === 'approved') {
+      result = result.filter(b => b.bstatus === 1);
+    } else if (filterType === 'rejected') {
+      result = result.filter(b => b.bstatus === 0);
+    } else if (filterType.startsWith('v_')) {
+      const vid = parseInt(filterType.split('_')[1]);
+      result = result.filter(b => b.bvid === vid);
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'date_asc': return new Date(a.bdate).getTime() - new Date(b.bdate).getTime();
+        case 'date_desc': return new Date(b.bdate).getTime() - new Date(a.bdate).getTime();
+        case 'name_asc': return a.bname.localeCompare(b.bname);
+        case 'name_desc': return b.bname.localeCompare(a.bname);
+        case 'remaining_asc': return a.bcwei - b.bcwei;
+        case 'remaining_desc': return b.bcwei - a.bcwei;
+        case 'status_asc': return b.bstatus - a.bstatus; // 1 (Approved) first
+        case 'status_desc': return a.bstatus - b.bstatus; // 0 (Rejected) first
+        default: return 0;
+      }
+    });
+
+    return result;
+  }, [batches, filterType, sortBy]);
 
   const handleCopySummary = async () => {
     if (!batches || !varieties) return;
@@ -56,20 +103,53 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold text-slate-800">
-          {t('batch.current_stock')}
-        </h2>
-        <button
+      {/* Controls Row */}
+      <div className="flex items-center gap-2 pb-2 overflow-x-auto no-scrollbar">
+        <button 
           onClick={onAdd}
-          className="bg-emerald-500 text-white p-2 rounded-full shadow-lg hover:bg-emerald-600 transition-colors"
+          className="bg-emerald-500 text-white p-2.5 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-colors shrink-0"
         >
           <Plus size={20} />
+        </button>
+
+        <button 
+          onClick={() => setShowFilterModal(true)}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-bold transition-all border shrink-0",
+            filterType === 'all' 
+              ? "bg-white text-slate-600 border-slate-100" 
+              : "bg-slate-800 text-white border-slate-800 shadow-lg shadow-slate-100"
+          )}
+        >
+          <Filter size={14} />
+          {filterType === 'all' ? t('batch.filter') : (
+            filterType === 'remaining' ? t('batch.filter.remaining') :
+            filterType === 'no_remaining' ? t('batch.filter.no_remaining') :
+            filterType === 'approved' ? t('batch.filter.approved') :
+            filterType === 'rejected' ? t('batch.filter.rejected') :
+            filterType.startsWith('v_') ? getVarietyName(parseInt(filterType.split('_')[1])) : t('batch.filter')
+          )}
+        </button>
+
+        <button 
+          onClick={() => setShowSortModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] bg-white text-slate-600 border border-slate-100 font-bold transition-all shrink-0 hover:bg-slate-50"
+        >
+          <ArrowUpDown size={14} />
+          {t('batch.sort')}: {
+            sortBy === 'date_asc' ? t('batch.sort.date_asc') :
+            sortBy === 'date_desc' ? t('batch.sort.date_desc') :
+            sortBy === 'name_asc' ? t('batch.sort.name_asc') :
+            sortBy === 'name_desc' ? t('batch.sort.name_desc') :
+            sortBy === 'remaining_asc' ? t('batch.sort.remaining_asc') :
+            sortBy === 'remaining_desc' ? t('batch.sort.remaining_desc') :
+            sortBy === 'status_asc' ? t('batch.sort.status_asc') : t('batch.sort.status_desc')
+          }
         </button>
       </div>
 
       <div className="grid gap-3">
-        {batches?.map((batch) => (
+        {filteredAndSortedBatches.map((batch) => (
           <div key={batch.bid} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 relative">
             <div 
               className={cn(
@@ -144,6 +224,18 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
       </button>
 
       {/* Modals */}
+      <FilterModal 
+        isOpen={showFilterModal} 
+        onClose={() => setShowFilterModal(false)}
+        filterType={filterType}
+        setFilterType={setFilterType}
+      />
+      <SortModal
+        isOpen={showSortModal}
+        onClose={() => setShowSortModal(false)}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+      />
       <HistoryModal bid={historyModal} onClose={() => setHistoryModal(null)} />
       <ModifyBatchModal bid={modifyModal} onClose={() => setModifyModal(null)} />
       <DeleteModal bid={deleteConfirm} onClose={() => setDeleteConfirm(null)} />
@@ -159,6 +251,109 @@ function MenuButton({ icon, label, onClick, className }: { icon: React.ReactNode
     >
       {icon}
       {label}
+    </button>
+  );
+}
+
+function FilterModal({ isOpen, onClose, filterType, setFilterType }: { isOpen: boolean, onClose: () => void, filterType: FilterType, setFilterType: (f: FilterType) => void }) {
+  const { t } = useI18n();
+  const varieties = useVarieties();
+
+  if (!isOpen) return null;
+
+  const handleSelect = (f: FilterType) => {
+    setFilterType(f);
+    onClose();
+  };
+
+  return (
+    <Modal title={t('batch.filter')} onClose={onClose}>
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('batch.status')}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <FilterOption label={t('batch.filter.all')} active={filterType === 'all'} onClick={() => handleSelect('all')} />
+            <FilterOption label={t('batch.filter.remaining')} active={filterType === 'remaining'} onClick={() => handleSelect('remaining')} />
+            <FilterOption label={t('batch.filter.no_remaining')} active={filterType === 'no_remaining'} onClick={() => handleSelect('no_remaining')} />
+            <FilterOption label={t('batch.filter.approved')} active={filterType === 'approved'} onClick={() => handleSelect('approved')} />
+            <FilterOption label={t('batch.filter.rejected')} active={filterType === 'rejected'} onClick={() => handleSelect('rejected')} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('variety.label')}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {varieties?.map(v => (
+              <FilterOption 
+                key={v.vid} 
+                label={v.vname} 
+                active={filterType === `v_${v.vid}`} 
+                onClick={() => handleSelect(`v_${v.vid}`)} 
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function SortModal({ isOpen, onClose, sortBy, setSortBy }: { isOpen: boolean, onClose: () => void, sortBy: SortType, setSortBy: (s: SortType) => void }) {
+  const { t } = useI18n();
+
+  if (!isOpen) return null;
+
+  const handleSelect = (s: SortType) => {
+    setSortBy(s);
+    onClose();
+  };
+
+  return (
+    <Modal title={t('batch.sort')} onClose={onClose}>
+      <div className="grid grid-cols-1 gap-2">
+        <SortOption label={t('batch.sort.date_asc')} active={sortBy === 'date_asc'} onClick={() => handleSelect('date_asc')} />
+        <SortOption label={t('batch.sort.date_desc')} active={sortBy === 'date_desc'} onClick={() => handleSelect('date_desc')} />
+        <SortOption label={t('batch.sort.name_asc')} active={sortBy === 'name_asc'} onClick={() => handleSelect('name_asc')} />
+        <SortOption label={t('batch.sort.name_desc')} active={sortBy === 'name_desc'} onClick={() => handleSelect('name_desc')} />
+        <SortOption label={t('batch.sort.remaining_asc')} active={sortBy === 'remaining_asc'} onClick={() => handleSelect('remaining_asc')} />
+        <SortOption label={t('batch.sort.remaining_desc')} active={sortBy === 'remaining_desc'} onClick={() => handleSelect('remaining_desc')} />
+        <SortOption label={t('batch.sort.status_asc')} active={sortBy === 'status_asc'} onClick={() => handleSelect('status_asc')} />
+        <SortOption label={t('batch.sort.status_desc')} active={sortBy === 'status_desc'} onClick={() => handleSelect('status_desc')} />
+      </div>
+    </Modal>
+  );
+}
+
+function FilterOption({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={cn(
+        "px-4 py-3 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between",
+        active 
+          ? "bg-slate-800 text-white border-slate-800" 
+          : "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100"
+      )}
+    >
+      {label}
+      {active && <Check size={14} />}
+    </button>
+  );
+}
+
+function SortOption({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={cn(
+        "px-4 py-3 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between",
+        active 
+          ? "bg-emerald-500 text-white border-emerald-500" 
+          : "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100"
+      )}
+    >
+      {label}
+      {active && <Check size={14} />}
     </button>
   );
 }
@@ -359,5 +554,37 @@ function Modal({ title, children, onClose }: { title: string, children: React.Re
         </div>
       </motion.div>
     </div>
+  );
+}
+
+function FilterChip({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={cn(
+        "px-4 py-2 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border",
+        active 
+          ? "bg-slate-800 text-white border-slate-800 shadow-sm" 
+          : "bg-white text-slate-500 border-slate-100 hover:border-slate-200"
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SortChip({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={cn(
+        "px-4 py-2 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border",
+        active 
+          ? "bg-emerald-500 text-white border-emerald-500 shadow-sm" 
+          : "bg-white text-slate-500 border-slate-100 hover:border-slate-200"
+      )}
+    >
+      {label}
+    </button>
   );
 }

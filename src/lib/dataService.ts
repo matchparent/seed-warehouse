@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { Variety, Destination, Batch, SendingRecord } from '../types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState, useEffect } from 'react';
 
@@ -131,7 +131,8 @@ class DataService {
       ...r,
       sid: toNum(r.sid),
       sstate: toNum(r.sstate),
-      sdest: toNum(r.sdest)
+      sdest: toNum(r.sdest),
+      soid: r.soid ? toNum(r.soid) : undefined
     }));
   }
 
@@ -225,6 +226,80 @@ class DataService {
     return records.find(r => r.sid === id);
   }
 
+  async getOrderStatuses(): Promise<OrderStatusType[]> {
+    if (this.mode === 'dexie') return db.tab_order_status.toArray();
+    const res = await fetch('/api/tab_order_status');
+    return res.json();
+  }
+
+  async getOrderCustomTypes(): Promise<OrderCustomType[]> {
+    if (this.mode === 'dexie') return db.tab_order_custom.toArray();
+    const res = await fetch('/api/tab_order_custom');
+    return res.json();
+  }
+
+  async getOrders(includeDeleted = false): Promise<Order[]> {
+    const toNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    };
+
+    let data: any[];
+    if (this.mode === 'dexie') {
+      const q = db.tab_orders;
+      data = await q.orderBy('ocdate').reverse().toArray();
+    } else {
+      const res = await fetch('/api/tab_orders');
+      data = await res.json();
+    }
+
+    const result = data.map((o: any) => ({
+      ...o,
+      oid: toNum(o.oid),
+      status: toNum(o.status),
+      odest: toNum(o.odest),
+      octype: toNum(o.octype)
+    }));
+
+    return includeDeleted ? result : result.filter((o: any) => o.status !== 7);
+  }
+
+  async addOrder(order: Omit<Order, 'oid'>): Promise<number> {
+    let id: number;
+    if (this.mode === 'dexie') {
+      id = (await db.tab_orders.add(order as Order)) as number;
+    } else {
+      const res = await fetch('/api/tab_orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order)
+      });
+      const data = await res.json();
+      id = data.oid;
+    }
+    await this.log(`新增订单: 客户 ${order.ocname}, 日期 ${order.ocdate}`);
+    return id;
+  }
+
+  async updateOrder(id: number, changes: Partial<Order>): Promise<void> {
+    if (this.mode === 'dexie') {
+      await db.tab_orders.update(id, changes);
+    } else {
+      await fetch(`/api/tab_orders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes)
+      });
+    }
+    await this.log(`更新订单 ID ${id}: ${JSON.stringify(changes)}`);
+  }
+
+  async deleteOrder(id: number): Promise<void> {
+    // Logical delete
+    await this.updateOrder(id, { status: 7 });
+    await this.log(`删除订单 ID ${id} (逻辑删除)`);
+  }
+
   async verifyUser(spellname: string, key: string): Promise<boolean> {
     if (this.mode === 'dexie') {
       const user = await db.tab_user.where({ spellname, key }).first();
@@ -309,7 +384,8 @@ export function useSendingRecords(ordered = true, date?: string) {
       ...r,
       sid: toNum(r.sid),
       sstate: toNum(r.sstate),
-      sdest: toNum(r.sdest)
+      sdest: toNum(r.sdest),
+      soid: r.soid ? toNum(r.soid) : undefined
     })));
   }, [ordered, date]);
   const [mysqlData, setMysqlData] = useState<SendingRecord[] | undefined>(undefined);
@@ -328,5 +404,46 @@ export function useSendingRecord(id: number | null) {
   const dexieData = useLiveQuery(() => id ? db.tab_sending_record.get(id) : undefined, [id]);
   const [mysqlData, setMysqlData] = useState<SendingRecord | undefined>(undefined);
   useEffect(() => { if (dataService.getMode() === 'mysql' && id) dataService.getSendingRecord(id).then(setMysqlData); }, [id]);
+  return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
+}
+
+export function useOrders(includeDeleted = false) {
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const dexieData = useLiveQuery(() => 
+    db.tab_orders.orderBy('ocdate').reverse().toArray().then(data => 
+      data.map(o => ({
+        ...o,
+        oid: toNum(o.oid),
+        status: toNum(o.status),
+        odest: toNum(o.odest),
+        octype: toNum(o.octype)
+      })).filter(o => includeDeleted || o.status !== 7)
+    ), [includeDeleted]);
+
+  const [mysqlData, setMysqlData] = useState<Order[] | undefined>(undefined);
+  useEffect(() => { 
+    if (dataService.getMode() === 'mysql') {
+      dataService.getOrders(includeDeleted).then(setMysqlData);
+    }
+  }, [includeDeleted]);
+
+  return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
+}
+
+export function useOrderStatuses() {
+  const dexieData = useLiveQuery(() => db.tab_order_status.toArray());
+  const [mysqlData, setMysqlData] = useState<OrderStatusType[] | undefined>(undefined);
+  useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getOrderStatuses().then(setMysqlData); }, []);
+  return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
+}
+
+export function useOrderCustomTypes() {
+  const dexieData = useLiveQuery(() => db.tab_order_custom.toArray());
+  const [mysqlData, setMysqlData] = useState<OrderCustomType[] | undefined>(undefined);
+  useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getOrderCustomTypes().then(setMysqlData); }, []);
   return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
 }
