@@ -169,14 +169,22 @@ async function startServer() {
           table.integer('oarpc').defaultTo(1);
           table.text('ogsented');
           table.text('omemo');
+          table.string('orf'); // Refund amount
+          table.integer('orfc').defaultTo(1); // Refund currency
         });
       } else {
-        // Migration check for oard, oarr
+        // Migration check for oard, oarr, orf, orfc
         const columns = await db('tab_orders').columnInfo();
         if (!columns.oard) {
            await db.schema.table('tab_orders', (table) => {
              table.string('oard');
              table.string('oarr');
+           });
+        }
+        if (!columns.orf) {
+           await db.schema.table('tab_orders', (table) => {
+             table.string('orf');
+             table.integer('orfc').defaultTo(1);
            });
         }
       }
@@ -194,6 +202,19 @@ async function startServer() {
           { wid: -2, wname: 'Anasoy', wlocation: 7 },
           { wid: -3, wname: 'Bagdad', wlocation: 5 }
         ]);
+      }
+
+      // Batch modified schema
+      const hasBatchModify = await db.schema.hasTable('tab_batch_modify');
+      if (!hasBatchModify) {
+        await db.schema.createTable('tab_batch_modify', (table) => {
+          table.increments('bmid').primary();
+          table.integer('bid').notNullable();
+          table.integer('bmop').notNullable();
+          table.double('bmvolume').notNullable();
+          table.text('bmmemo');
+          table.string('bmdate').notNullable();
+        });
       }
 
       // Ensure columns bowei and bcwei are DOUBLE instead of FLOAT to prevent rounding/double/float conversion issues
@@ -247,26 +268,31 @@ async function startServer() {
       }
 
       const orderStatusCount = await db('tab_order_status').count('osid as count').first();
-      if ((orderStatusCount as any).count === 0) {
+      if ((orderStatusCount as any).count === 0 || (orderStatusCount as any).count !== 7) {
+        await db.raw("SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_AUTO_VALUE_ON_ZERO')").catch(() => {});
+        await db('tab_order_status').truncate().catch(() => {});
         await db('tab_order_status').insert([
+          { osid: 0, oscname: '已删除', osuname: 'O\'chirildi', osename: 'Deleted' },
           { osid: 1, oscname: '有意愿', osuname: 'Iroda', osename: 'Intentional' },
           { osid: 2, oscname: '已签约', osuname: 'Shartnoma imzolanadi', osename: 'Signed' },
           { osid: 3, oscname: '已付定金', osuname: 'Zakalat to\'langan', osename: 'Deposit Paid' },
           { osid: 4, oscname: '已付全款', osuname: 'To\'liq to\'langan', osename: 'Full Paid' },
           { osid: 5, oscname: '已完成', osuname: 'Tugatildi', osename: 'Completed' },
-          { osid: 6, oscname: '已退款', osuname: 'Qaytarilgan', osename: 'Refunded' },
-          { osid: 7, oscname: '已删除', osuname: 'O\'chirildi', osename: 'Deleted' }
-        ]);
+          { osid: 6, oscname: '已退款', osuname: 'Qaytarilgan', osename: 'Refunded' }
+        ]).catch(err => console.error("Could not insert order statuses in MySQL: ", err));
       }
 
       const orderCustomCount = await db('tab_order_custom').count('ocid as count').first();
-      if ((orderCustomCount as any).count === 0) {
+      if ((orderCustomCount as any).count === 0 || (orderCustomCount as any).count !== 6) {
+        await db('tab_order_custom').truncate().catch(() => {});
         await db('tab_order_custom').insert([
           { ocid: 1, occname: '政府', ocuname: 'Hukumat', ocename: 'Government' },
           { ocid: 2, occname: 'Cluster', ocuname: 'Klaster', ocename: 'Cluster' },
           { ocid: 3, occname: 'AKIS', ocuname: 'AKIS', ocename: 'AKIS' },
-          { ocid: 4, occname: '散户', ocuname: 'Xususiy fermerlar', ocename: 'Private Farmer' }
-        ]);
+          { ocid: 4, occname: '散户', ocuname: 'Xususiy fermerlar', ocename: 'Private Farmer' },
+          { ocid: 5, occname: '机构', ocuname: 'Tashkilot', ocename: 'Institution' },
+          { ocid: 6, occname: '经销商', ocuname: 'Diler', ocename: 'Distributor' }
+        ]).catch(err => console.error("Could not update custom types in MySQL:", err));
       }
       console.log('MySQL schemas checked/initialized.');
     } catch (err) {
@@ -344,6 +370,7 @@ async function startServer() {
   setupTableRoutes('tab_order_status', 'osid');
   setupTableRoutes('tab_order_custom', 'ocid');
   setupTableRoutes('tab_warehouses', 'wid');
+  setupTableRoutes('tab_batch_modify', 'bmid');
 
   app.post("/api/auth/login", async (req, res) => {
     const { spellname, key } = req.body;

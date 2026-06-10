@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType, Warehouse } from '../types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatus, OrderStatusType, OrderCustomType, Warehouse, BatchModify } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState, useEffect } from 'react';
 
@@ -315,7 +315,7 @@ class DataService {
 
   async deleteOrder(id: number): Promise<void> {
     // Logical delete
-    await this.updateOrder(id, { status: 7 });
+    await this.updateOrder(id, { status: OrderStatus.DELETED });
     await this.log(`删除订单 ID ${id} (逻辑删除)`);
   }
 
@@ -336,6 +336,47 @@ class DataService {
       console.error('Login verification failed', e);
       return false;
     }
+  }
+
+  async addBatchModify(record: Omit<BatchModify, 'bmid'>): Promise<number> {
+    let id: number;
+    if (this.mode === 'dexie') {
+      id = (await db.tab_batch_modify.add(record as BatchModify)) as number;
+    } else {
+      const res = await fetch('/api/tab_batch_modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record)
+      });
+      const data = await res.json();
+      id = data.bmid;
+    }
+    await this.log(`批次修改: 批次 ID ${record.bid}, 类型 ${record.bmop === 1 ? '库存补充' : '损耗/赠予'}, 数量 ${record.bmvolume}t`);
+    window.dispatchEvent(new CustomEvent('batch_modify_changed'));
+    return id;
+  }
+
+  async getBatchModifications(): Promise<BatchModify[]> {
+    const toNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    };
+
+    let data: any[];
+    if (this.mode === 'dexie') {
+      data = await db.tab_batch_modify.toArray();
+    } else {
+      const res = await fetch('/api/tab_batch_modify');
+      data = await res.json();
+    }
+
+    return data.map((bm: any) => ({
+      ...bm,
+      bmid: toNum(bm.bmid),
+      bid: toNum(bm.bid),
+      bmop: toNum(bm.bmop),
+      bmvolume: toNum(bm.bmvolume)
+    }));
   }
 }
 
@@ -478,5 +519,38 @@ export function useOrderCustomTypes() {
   const dexieData = useLiveQuery(() => db.tab_order_custom.toArray());
   const [mysqlData, setMysqlData] = useState<OrderCustomType[] | undefined>(undefined);
   useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getOrderCustomTypes().then(setMysqlData); }, []);
+  return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
+}
+
+export function useBatchModifications() {
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const dexieData = useLiveQuery(() => 
+    db.tab_batch_modify.toArray().then(data => data.map(bm => ({
+      ...bm,
+      bmid: toNum(bm.bmid),
+      bid: toNum(bm.bid),
+      bmop: toNum(bm.bmop),
+      bmvolume: toNum(bm.bmvolume)
+    })))
+  );
+  const [mysqlData, setMysqlData] = useState<BatchModify[] | undefined>(undefined);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const handleRefresh = () => setTick(t => t + 1);
+    window.addEventListener('batch_modify_changed', handleRefresh);
+    return () => window.removeEventListener('batch_modify_changed', handleRefresh);
+  }, []);
+
+  useEffect(() => { 
+    if (dataService.getMode() === 'mysql') {
+      dataService.getBatchModifications().then(setMysqlData); 
+    }
+  }, [tick]);
+
   return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
 }

@@ -39,6 +39,19 @@ export default function AddOrderPage({ onBack, editOrder }: AddOrderPageProps) {
   const customTypes = useOrderCustomTypes();
   const varieties = useVarieties();
 
+  const getStatusText = (s: number) => {
+    switch (s) {
+      case OrderStatus.INTENTIONAL: return t('status.intentional');
+      case OrderStatus.SIGNED: return t('status.signed');
+      case OrderStatus.DEPOSIT_PAID: return t('status.deposit_paid');
+      case OrderStatus.FULL_PAID: return t('status.full_paid');
+      case OrderStatus.COMPLETED: return t('status.completed');
+      case OrderStatus.DELETED: return t('status.deleted');
+      case OrderStatus.REFUNDED: return t('status.refunded');
+      default: return 'Unknown';
+    }
+  };
+
   const [loading, setLoading] = useState(false);
   const [dest, setDest] = useState(editOrder?.odest || '');
   const [customType, setCustomType] = useState(editOrder?.octype || '');
@@ -49,6 +62,9 @@ export default function AddOrderPage({ onBack, editOrder }: AddOrderPageProps) {
   const [received, setReceived] = useState(editOrder?.oarp || '');
   const [receivedCurrency, setReceivedCurrency] = useState(editOrder?.oarpc || 1);
   const [memo, setMemo] = useState(editOrder?.omemo || '');
+  const [status, setStatus] = useState<number>(editOrder?.status ?? OrderStatus.INTENTIONAL);
+  const [refundAmount, setRefundAmount] = useState(editOrder?.orf || '');
+  const [refundCurrency, setRefundCurrency] = useState(editOrder?.orfc || 1);
   
   const [needs, setNeeds] = useState<{vid: string, qty: string}[]>(
     editOrder?.ossgi.split(',').map(s => {
@@ -104,7 +120,6 @@ export default function AddOrderPage({ onBack, editOrder }: AddOrderPageProps) {
 
     setLoading(true);
     try {
-      const status = editOrder?.status || OrderStatus.INTENTIONAL;
       let ocdate = editOrder?.ocdate || '';
       if (!ocdate) {
         ocdate = `${status}-${formatSimpleDate()}`;
@@ -123,7 +138,9 @@ export default function AddOrderPage({ onBack, editOrder }: AddOrderPageProps) {
         oarp: received || '',
         oarpc: Number(receivedCurrency),
         omemo: memo || '',
-        ogsented: editOrder?.ogsented || ''
+        ogsented: editOrder?.ogsented || '',
+        orf: status === OrderStatus.REFUNDED ? refundAmount : '',
+        orfc: status === OrderStatus.REFUNDED ? Number(refundCurrency) : 1
       };
 
       if (editOrder) {
@@ -234,6 +251,53 @@ export default function AddOrderPage({ onBack, editOrder }: AddOrderPageProps) {
                 <select 
                   value={receivedCurrency} 
                   onChange={e => setReceivedCurrency(Number(e.target.value))}
+                  className="bg-slate-50 px-2 py-1 rounded-lg text-xs font-bold focus:outline-none"
+                >
+                  <option value={1}>{t('currency.uzs')}</option>
+                  <option value={2}>{t('currency.usd')}</option>
+                  <option value={3}>{t('currency.cny')}</option>
+                </select>
+              </div>
+            </FormField>
+          )}
+
+          {editOrder && (
+            <FormField icon={<AlertCircle size={18} />} label={t('order.status')}>
+              <select 
+                value={status} 
+                onChange={e => setStatus(Number(e.target.value))} 
+                className="w-full bg-transparent text-sm font-bold focus:outline-none"
+              >
+                {[
+                  OrderStatus.INTENTIONAL,
+                  OrderStatus.SIGNED,
+                  OrderStatus.DEPOSIT_PAID,
+                  OrderStatus.FULL_PAID,
+                  OrderStatus.COMPLETED,
+                  OrderStatus.REFUNDED,
+                  OrderStatus.DELETED
+                ].map(s => (
+                  <option key={s} value={s}>{getStatusText(s)}</option>
+                ))}
+              </select>
+            </FormField>
+          )}
+
+          {status === OrderStatus.REFUNDED && (
+            <FormField icon={<Wallet size={18} />} label="退款金额 / Refund Amount">
+              <div className="flex gap-2 w-full">
+                <input 
+                  type="number" 
+                  step="any"
+                  min="0"
+                  value={refundAmount} 
+                  onChange={e => setRefundAmount(e.target.value)} 
+                  className="flex-1 bg-transparent text-sm font-bold focus:outline-none" 
+                  placeholder="0.00"
+                />
+                <select 
+                  value={refundCurrency} 
+                  onChange={e => setRefundCurrency(Number(e.target.value))}
                   className="bg-slate-50 px-2 py-1 rounded-lg text-xs font-bold focus:outline-none"
                 >
                   <option value={1}>{t('currency.uzs')}</option>

@@ -18,11 +18,13 @@ import {
   FileText,
   Filter,
   ArrowUpDown,
-  Home
+  Home,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { cn, formatWeight, formatDate, copyToClipboard, isWeightExceeded, safeToFixed } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { useBatches, useVarieties, useSendingRecords, useBatch, useWarehouses, useDestinations, dataService } from '../lib/dataService';
+import { useBatches, useVarieties, useSendingRecords, useBatch, useWarehouses, useDestinations, useBatchModifications, useOrders, dataService } from '../lib/dataService';
 import { useI18n } from '../lib/i18n';
 
 type FilterType = 'all' | 'remaining' | 'no_remaining' | 'approved' | 'rejected' | string;
@@ -53,6 +55,8 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
   const [historyModal, setHistoryModal] = useState<number | null>(null);
   const [modifyModal, setModifyModal] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [supplementModal, setSupplementModal] = useState<number | null>(null);
+  const [deductionModal, setDeductionModal] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
   const getVarietyName = (vid: number) => varieties?.find(v => v.vid === vid)?.vname || '未知';
@@ -250,6 +254,8 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
                   >
                     <MenuButton icon={<History size={14} />} label={t('batch.history')} onClick={() => { setHistoryModal(batch.bid); setMenuOpen(null); }} />
                     <MenuButton icon={<Edit2 size={14} />} label={t('batch.modify')} onClick={() => { setModifyModal(batch.bid); setMenuOpen(null); }} />
+                    <MenuButton icon={<TrendingUp size={14} className="text-emerald-500" />} label={t('batch.supplement')} onClick={() => { setSupplementModal(batch.bid); setMenuOpen(null); }} />
+                    <MenuButton icon={<TrendingDown size={14} className="text-amber-500" />} label={t('batch.deduction')} onClick={() => { setDeductionModal(batch.bid); setMenuOpen(null); }} />
                     <MenuButton icon={<Trash2 size={14} />} label={t('batch.delete')} onClick={() => { setDeleteConfirm(batch.bid); setMenuOpen(null); }} className="text-red-500" />
                   </motion.div>
                 </>
@@ -283,6 +289,8 @@ export default function BatchListFragment({ onAdd }: { onAdd: () => void }) {
       <HistoryModal bid={historyModal} onClose={() => setHistoryModal(null)} />
       <ModifyBatchModal bid={modifyModal} onClose={() => setModifyModal(null)} />
       <DeleteModal bid={deleteConfirm} onClose={() => setDeleteConfirm(null)} />
+      <SupplementStockModal bid={supplementModal} onClose={() => setSupplementModal(null)} />
+      <DeductionStockModal bid={deductionModal} onClose={() => setDeductionModal(null)} />
     </div>
   );
 }
@@ -402,19 +410,48 @@ function SortOption({ label, active, onClick }: { label: string, active: boolean
   );
 }
 
-// --- Modal Components ---
-
 function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
   const { t } = useI18n();
   const batch = useBatch(bid);
   const varieties = useVarieties();
   const records = useSendingRecords(false);
+  const batchModifications = useBatchModifications();
+  const warehouses = useWarehouses();
+  const destinations = useDestinations();
+  const orders = useOrders(true);
 
   if (!bid || !batch) return null;
 
-  const history = records?.filter(r => r.sstate === 3 && r.sainfo.includes(`${bid}/`)).map(r => {
+  const shipments = (records?.filter(r => r.sstate === 3 && r.sainfo.includes(`${bid}/`)) || []).map(r => {
     const weight = parseFloat(r.sainfo.split(',').find(s => s.startsWith(`${bid}/`))?.split('/')[1] || '0');
-    return { ...r, weight };
+    return {
+      type: 'shipment',
+      date: r.sdate,
+      desc: r.splate,
+      weight: -weight,
+      id: r.sid!,
+      memo: '',
+      raw: r
+    };
+  });
+
+  const modifications = (batchModifications?.filter(bm => bm.bid === bid) || []).map(bm => {
+    const isSupplement = bm.bmop === 1;
+    return {
+      type: 'adjustment',
+      date: bm.bmdate,
+      desc: isSupplement ? '库存补充' : '损耗/赠予',
+      weight: isSupplement ? bm.bmvolume : -bm.bmvolume,
+      id: bm.bmid!,
+      memo: bm.bmmemo,
+      raw: null as any
+    };
+  });
+
+  const history = [...shipments, ...modifications].sort((a, b) => {
+    const cmp = b.date.localeCompare(a.date);
+    if (cmp !== 0) return cmp;
+    return b.id - a.id;
   });
 
   return (
@@ -430,13 +467,45 @@ function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => voi
         </div>
         
         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-          {history?.length ? history.map(h => (
-            <div key={h.sid} className="p-2 border-b border-slate-100 flex justify-between items-center text-xs">
+          {history?.length ? history.map((h, idx) => (
+            <div key={`${h.type}-${h.id}-${idx}`} className="p-2.5 border-b border-slate-100 flex justify-between items-center text-xs hover:bg-slate-50/50 rounded-lg">
               <div>
-                <div className="font-bold text-slate-700">{h.splate}</div>
-                <div className="text-slate-400">{formatDate(h.sdate)}</div>
+                <div className="font-bold text-slate-700 flex flex-col gap-0.5">
+                  {h.type === 'adjustment' ? (
+                    <div className="flex items-center gap-1.5">
+                      {h.weight > 0 ? <TrendingUp size={13} className="text-emerald-500" /> : <TrendingDown size={13} className="text-amber-500" />}
+                      {h.desc}
+                    </div>
+                  ) : (
+                    <>
+                      <div>{t('shipment.splate_label') || '车牌号：'}{h.desc}</div>
+                      {h.raw && h.raw.soid && h.raw.soid < 0 ? (
+                        <div className="text-[10px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100/30 w-fit mt-0.5">
+                          {t('shipment.transfer_to') || '转运至'}: {warehouses?.find(w => w.wid === h.raw.soid || w.wid === Math.abs(h.raw.soid))?.wname || '未知仓库'}
+                        </div>
+                      ) : h.raw && h.raw.soid && h.raw.soid > 0 ? (
+                        <div className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/30 flex items-center gap-1 flex-wrap w-fit mt-0.5">
+                          <span>{t('shipment.destination') || '目的地'}: {destinations?.find(d => d.did === h.raw.sdest)?.dname || '未知'}</span>
+                          <span className="text-slate-300">|</span>
+                          <span>{t('shipment.order_subject') || '订单主体'}: {orders?.find(o => o.oid === h.raw.soid)?.ocname || '未知'}</span>
+                        </div>
+                      ) : (
+                        h.raw && <div className="text-[10px] text-slate-500 w-fit mt-0.5">
+                          {t('shipment.destination') || '目的地'}: {destinations?.find(d => d.did === h.raw.sdest)?.dname || '未知'}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1">{formatDate(h.date)}</div>
+                {h.memo && <div className="text-[10px] text-slate-500 italic mt-0.5">备注：{h.memo}</div>}
               </div>
-              <div className="text-red-500 font-bold">-{formatWeight(h.weight)}t</div>
+              <div className={cn(
+                "font-bold font-mono text-xs",
+                h.weight > 0 ? "text-emerald-600" : "text-red-500"
+              )}>
+                {h.weight > 0 ? '+' : ''}{formatWeight(h.weight)}t
+              </div>
             </div>
           )) : <div className="text-center py-8 text-slate-400 text-xs italic font-medium">{t('batch.no_records')}</div>}
         </div>
@@ -448,13 +517,11 @@ function HistoryModal({ bid, onClose }: { bid: number | null, onClose: () => voi
 function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
   const { t } = useI18n();
   const batch = useBatch(bid);
-  const [weight, setWeight] = useState('');
   const [status, setStatus] = useState<number>(0);
   const [memo, setMemo] = useState('');
 
   React.useEffect(() => {
     if (batch) {
-      setWeight(batch.bcwei.toString());
       setStatus(batch.bstatus);
       setMemo(batch.bmemo || '');
     }
@@ -463,16 +530,12 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
   if (!bid || !batch) return null;
 
   const handleConfirm = async () => {
-    const w = parseFloat(weight);
-    if (isNaN(w) || isWeightExceeded(w, batch.bowei)) return;
-    
     const extraUpdates: any = {};
     if (batch.bstatus === 2 && status !== 2) {
       extraUpdates.bdate = new Date().toISOString().split('T')[0];
     }
 
     await dataService.updateBatch(bid, { 
-      bcwei: w,
       bstatus: status,
       bmemo: memo,
       ...extraUpdates
@@ -547,23 +610,6 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
         )}
 
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.remaining')} (t)</label>
-          <div className="relative">
-            <input 
-              type="number" 
-              step="0.001"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none pr-8 font-mono font-bold"
-              placeholder={t('form.total_weight_t')}
-            />
-            <span className="absolute right-3 top-3 text-[10px] text-slate-400">t</span>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-1 font-medium">{t('batch.max_adj')}: {formatWeight(batch.bowei)}t</p>
-          {isWeightExceeded(parseFloat(weight), batch.bowei) && <p className="text-[10px] text-red-500 mt-1 font-bold">{t('batch.weight_exceeded')}</p>}
-        </div>
-
-        <div>
           <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.memo')}</label>
           <textarea 
             rows={3}
@@ -576,8 +622,7 @@ function ModifyBatchModal({ bid, onClose }: { bid: number | null, onClose: () =>
 
         <button 
           onClick={handleConfirm}
-          disabled={!weight || isWeightExceeded(parseFloat(weight), batch.bowei)}
-          className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold shadow-lg disabled:opacity-50"
+          className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold shadow-lg"
         >
           {t('action.confirm')}
         </button>
@@ -670,5 +715,261 @@ function SortChip({ label, active, onClick }: { label: string, active: boolean, 
     >
       {label}
     </button>
+  );
+}
+
+function SupplementStockModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
+  const { t } = useI18n();
+  const batch = useBatch(bid);
+  const [amount, setAmount] = useState('');
+  const [memo, setMemo] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    if (bid) {
+      setAmount('');
+      setMemo('');
+      setConfirming(false);
+      setError('');
+    }
+  }, [bid]);
+
+  if (!bid || !batch) return null;
+
+  const handleNext = () => {
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) {
+      setError('请输入大于0的有效补充量');
+      return;
+    }
+    const newTotal = Number(batch.bcwei) + val;
+    if (newTotal > Number(batch.bowei)) {
+      setError(`补充后的量不能超过初始上限 ${batch.bowei}t (当前剩余 ${batch.bcwei}t，最多可补充 ${safeToFixed(Number(batch.bowei) - Number(batch.bcwei), 3)}t)`);
+      return;
+    }
+    setError('');
+    setConfirming(true);
+  };
+
+  const handleConfirm = async () => {
+    const val = parseFloat(amount);
+    const newTotal = Number(batch.bcwei) + val;
+
+    await dataService.updateBatch(bid, {
+      bcwei: newTotal
+    });
+
+    await dataService.addBatchModify({
+      bid: bid,
+      bmop: 1, // 库存补充 -> 1
+      bmvolume: val,
+      bmmemo: memo,
+      bmdate: new Date().toISOString().split('T')[0]
+    });
+
+    onClose();
+  };
+
+  return (
+    <Modal title={t('batch.supplement.title')} onClose={onClose}>
+      {!confirming ? (
+        <div className="space-y-4">
+          <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100/50 text-xs">
+            <span className="font-bold text-emerald-800 text-xs block truncate mb-1">批次：{batch.bname}</span>
+            <div className="grid grid-cols-2 font-medium text-emerald-700">
+              <span>当前剩余: {batch.bcwei}t</span>
+              <span>初始上限: {batch.bowei}t</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.modify_volume')}</label>
+            <div className="relative">
+              <input 
+                type="number" 
+                step="0.001"
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setError('');
+                }}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none pr-8 font-mono font-bold"
+                placeholder="请输入补充数量"
+              />
+              <span className="absolute right-3 top-3 text-[10px] text-slate-400">t</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.memo')}</label>
+            <textarea 
+              rows={2}
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="请输入操作备注"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
+            />
+          </div>
+
+          {error && (
+            <div className="text-xs text-red-500 font-bold bg-red-50 p-2 border border-red-100 rounded-lg">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <button 
+            onClick={handleNext}
+            disabled={!amount}
+            className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg disabled:opacity-50"
+          >
+            确定
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 text-emerald-600 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+            <AlertCircle size={24} className="shrink-0" />
+            <div className="text-xs font-bold leading-relaxed">
+              是否确定补充库存？
+              <div className="mt-1">将增加：<span className="text-sm font-black text-emerald-700">{amount}t</span></div>
+              <div>变更后剩余：<span className="text-sm font-black text-emerald-700">{safeToFixed(Number(batch.bcwei) + parseFloat(amount), 3)}t</span></div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setConfirming(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">上一步</button>
+            <button onClick={handleConfirm} className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100">确认补充</button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function DeductionStockModal({ bid, onClose }: { bid: number | null, onClose: () => void }) {
+  const { t } = useI18n();
+  const batch = useBatch(bid);
+  const [amount, setAmount] = useState('');
+  const [memo, setMemo] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    if (bid) {
+      setAmount('');
+      setMemo('');
+      setConfirming(false);
+      setError('');
+    }
+  }, [bid]);
+
+  if (!bid || !batch) return null;
+
+  const handleNext = () => {
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) {
+      setError('请输入大于0的有效扣除量');
+      return;
+    }
+    const newTotal = Number(batch.bcwei) - val;
+    if (newTotal < 0) {
+      setError(`扣除后的量不能低于0 (当前剩余为 ${batch.bcwei}t，最多可扣除 ${batch.bcwei}t)`);
+      return;
+    }
+    setError('');
+    setConfirming(true);
+  };
+
+  const handleConfirm = async () => {
+    const val = parseFloat(amount);
+    const newTotal = Number(batch.bcwei) - val;
+
+    await dataService.updateBatch(bid, {
+      bcwei: newTotal < 0 ? 0 : newTotal
+    });
+
+    await dataService.addBatchModify({
+      bid: bid,
+      bmop: 2, // 损耗/赠予 -> 2
+      bmvolume: val,
+      bmmemo: memo,
+      bmdate: new Date().toISOString().split('T')[0]
+    });
+
+    onClose();
+  };
+
+  return (
+    <Modal title={t('batch.deduction.title')} onClose={onClose}>
+      {!confirming ? (
+        <div className="space-y-4">
+          <div className="bg-amber-50 p-3 rounded-xl border border-amber-100/50 text-xs">
+            <span className="font-bold text-amber-800 text-xs block truncate mb-1">批次：{batch.bname}</span>
+            <div className="grid grid-cols-2 font-medium text-amber-100">
+              <span className="text-amber-750">当前剩余: {batch.bcwei}t</span>
+              <span className="text-amber-750">初始上限: {batch.bowei}t</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.modify_volume')}</label>
+            <div className="relative">
+              <input 
+                type="number" 
+                step="0.001"
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setError('');
+                }}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none pr-8 font-mono font-bold"
+                placeholder="请输入扣除数量"
+              />
+              <span className="absolute right-3 top-3 text-[10px] text-slate-400">t</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block font-bold">{t('batch.memo')}</label>
+            <textarea 
+              rows={2}
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="请输入操作备注"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-xs"
+            />
+          </div>
+
+          {error && (
+            <div className="text-xs text-red-500 font-bold bg-red-50 p-2 border border-red-100 rounded-lg">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <button 
+            onClick={handleNext}
+            disabled={!amount}
+            className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold shadow-lg disabled:opacity-50"
+          >
+            确定
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 text-amber-600 bg-amber-50 p-4 rounded-xl border border-amber-100">
+            <AlertCircle size={24} className="shrink-0" />
+            <div className="text-xs font-bold leading-relaxed">
+              是否确定扣除库存？
+              <div className="mt-1">将扣除：<span className="text-sm font-black text-amber-700">-{amount}t</span></div>
+              <div>变更后剩余：<span className="text-sm font-black text-amber-700">{safeToFixed(Number(batch.bcwei) - parseFloat(amount), 3)}t</span></div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setConfirming(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">上一步</button>
+            <button onClick={handleConfirm} className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-bold shadow-lg shadow-amber-100">确认扣除</button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

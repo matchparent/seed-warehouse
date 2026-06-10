@@ -34,13 +34,13 @@ export enum ShipmentState {
 }
 
 export enum OrderStatus {
+  DELETED = 0, // 已删除
   INTENTIONAL = 1, // 有意愿
   SIGNED = 2, // 已签约
   DEPOSIT_PAID = 3, // 已付定金
   FULL_PAID = 4, // 已付全款
   COMPLETED = 5, // 已完成
   REFUNDED = 6, // 已退款
-  DELETED = 7, // 已删除
 }
 
 export interface OrderStatusType {
@@ -77,6 +77,8 @@ export interface Order {
   oarpc?: number; // Currency for oarp: 1-UZS, 2-USD, 3-CNY
   ogsented: string; // Sent goods "vid/qty,vid/qty"
   omemo: string;
+  orf?: string; // Refund amount (退款金额)
+  orfc?: number; // Refund currency code (退款结算货币)
 }
 
 export interface Warehouse {
@@ -98,4 +100,14 @@ export interface SendingRecord {
   smemo: string;
   soid?: number; // Foreign key to connect Order's oid, or Warehouse wid (if negative)
   sware?: number; // Source Warehouse ID
+}
+
+// 批次修改表 tab_batch_modify
+export interface BatchModify {
+  bmid?: number;
+  bid: number; // 关联的批次id
+  bmop: number; // 操作类型：1->库存补充，2->损耗/赠予
+  bmvolume: number; // 修改量
+  bmmemo: string; // 备注
+  bmdate: string; // 修改日期 'yyyy-MM-dd'
 }

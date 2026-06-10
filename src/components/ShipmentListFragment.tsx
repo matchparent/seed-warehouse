@@ -16,12 +16,14 @@ import {
   Trash2,
   Filter,
   MoreVertical,
-  Edit2
+  Edit2,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { cn, formatDate, safeToFixed } from '../lib/utils';
-import { ShipmentState, OrderStatus, Order } from '../types';
+import { ShipmentState, OrderStatus, Order, BatchModify, SendingRecord } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { useSendingRecords, useVarieties, useDestinations, useBatches, useBatch, useSendingRecord, dataService } from '../lib/dataService';
+import { useSendingRecords, useVarieties, useDestinations, useBatches, useBatch, useSendingRecord, useOrders, useWarehouses, useBatchModifications, dataService } from '../lib/dataService';
 import { useI18n } from '../lib/i18n';
 
 export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => void, onEdit: (id: number, state: ShipmentState) => void }) {
@@ -31,6 +33,9 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
   const varieties = useVarieties();
   const destinations = useDestinations();
   const batches = useBatches();
+  const orders = useOrders(true);
+  const warehouses = useWarehouses();
+  const batchModifications = useBatchModifications();
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState(() => localStorage.getItem('current_warehouse_id') || 'all');
   React.useEffect(() => {
@@ -46,6 +51,54 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
     if (selectedWarehouseId === 'all') return records;
     return records.filter(r => (r.sware !== undefined && r.sware !== null ? r.sware : -1) === parseInt(selectedWarehouseId));
   }, [records, selectedWarehouseId]);
+
+  const filteredModifications = React.useMemo(() => {
+    if (!batchModifications) return [];
+    return batchModifications.filter(bm => {
+      if (filterDate && bm.bmdate !== filterDate) return false;
+      if (selectedWarehouseId !== 'all') {
+        const batch = batches?.find(b => b.bid === bm.bid);
+        const bware = batch?.bware !== undefined && batch?.bware !== null ? batch.bware : -1;
+        return bware === parseInt(selectedWarehouseId);
+      }
+      return true;
+    });
+  }, [batchModifications, filterDate, selectedWarehouseId, batches]);
+
+  const unifiedHistory = React.useMemo(() => {
+    const listCount: any[] = [];
+    
+    // 1. Map SendingRecords
+    filteredRecords.forEach(r => {
+      listCount.push({
+        type: 'shipment',
+        date: r.sdate,
+        key: `shipment-${r.sid}`,
+        id: r.sid,
+        data: r
+      });
+    });
+
+    // 2. Map BatchModifications
+    filteredModifications.forEach(bm => {
+      listCount.push({
+        type: 'adjustment',
+        date: bm.bmdate,
+        key: `adjust-${bm.bmid}`,
+        id: bm.bmid,
+        data: bm
+      });
+    });
+
+    // Sort by date desc, then by secondary id desc
+    listCount.sort((a, b) => {
+      const cmp = b.date.localeCompare(a.date);
+      if (cmp !== 0) return cmp;
+      return b.id - a.id;
+    });
+
+    return listCount;
+  }, [filteredRecords, filteredModifications]);
 
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [deleteModal, setDeleteModal] = useState<number | null>(null);
@@ -106,14 +159,77 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
       </div>
 
       <div className="grid gap-3">
-        {filteredRecords.map((record) => {
+        {unifiedHistory.map((item) => {
+          if (item.type === 'adjustment') {
+            const bm = item.data as BatchModify;
+            const batch = batches?.find(b => b.bid === bm.bid);
+            const varietyName = varieties?.find(v => v.vid === batch?.bvid)?.vname || '未知品种';
+            const isSupplement = bm.bmop === 1;
+
+            return (
+              <motion.div 
+                key={item.key}
+                className={cn(
+                  "p-3 rounded-xl shadow-sm border space-y-2 bg-white",
+                  isSupplement ? "border-emerald-100" : "border-amber-100"
+                )}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-400">#A{bm.bmid}</span>
+                    <span className={cn(
+                      "text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase",
+                      isSupplement ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-705"
+                    )}>
+                      {isSupplement ? t('batch.supplement') : t('batch.deduction')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                    <Calendar size={10} /> {formatDate(bm.bmdate)}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-bold text-slate-700 flex items-center gap-1">
+                      {isSupplement ? (
+                        <TrendingUp size={15} className="text-emerald-500" />
+                      ) : (
+                        <TrendingDown size={15} className="text-amber-500" />
+                      )}
+                      {batch ? batch.bname : '未知批次'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-bold">
+                      {varietyName}
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "text-base font-black font-mono",
+                    isSupplement ? "text-emerald-600" : "text-amber-600"
+                  )}>
+                    {isSupplement ? '+' : '-'}{bm.bmvolume}t
+                  </div>
+                </div>
+
+                {bm.bmmemo && (
+                  <div className="text-[11px] text-slate-500 flex items-start gap-1 bg-slate-50 p-1.5 rounded border border-slate-100">
+                    <FileText size={12} className="shrink-0 mt-0.5 text-slate-400" />
+                    <p className="line-clamp-2">{bm.bmmemo}</p>
+                  </div>
+                )}
+              </motion.div>
+            );
+          }
+
+          // Otherwise normal shipment
+          const record = item.data as SendingRecord;
           const stateInfo = getStateLabel(record.sstate);
           const showPlanned = record.sstate === ShipmentState.NEW || record.sstate === ShipmentState.ALLOCATED;
           const info = showPlanned ? parseInfo(record.spinfo, 'variety') : parseInfo(record.sainfo, 'batch');
 
           return (
             <motion.div 
-              key={record.sid}
+              key={item.key}
               onClick={() => {
                 if (record.sstate === ShipmentState.NEW || record.sstate === ShipmentState.ALLOCATED) {
                   onEdit(record.sid!, record.sstate);
@@ -165,11 +281,13 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
                             label={t('shipment.modify')} 
                             onClick={() => { setModifyModal(record.sid!); setMenuOpen(null); }} 
                           />
-                          <MenuButton 
-                            icon={<RotateCcw size={14} />} 
-                            label={t('shipment.withdraw')} 
-                            onClick={() => { setWithdrawModal(record.sid!); setMenuOpen(null); }} 
-                          />
+                          {!(record.soid && record.soid < 0) && (
+                            <MenuButton 
+                              icon={<RotateCcw size={14} />} 
+                              label={t('shipment.withdraw')} 
+                              onClick={() => { setWithdrawModal(record.sid!); setMenuOpen(null); }} 
+                            />
+                          )}
                         </>
                       ) : (
                         <MenuButton 
@@ -186,16 +304,31 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
 
               <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                 <Truck size={14} className="text-emerald-500" />
-                {record.splate}
+                {t('shipment.splate_label') || '车牌号：'}{record.splate}
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="grid grid-cols-1 gap-1 text-[11px]">
                 <div className="flex items-center gap-1 text-slate-500">
                   <Phone size={12} /> {record.sdrpn || t('action.cancel')}
                 </div>
-                <div className="flex items-center gap-1 text-slate-500 truncate">
-                  <MapPin size={12} /> {destinations?.find(d => d.did === record.sdest)?.dname}
-                </div>
+                
+                {record.soid && record.soid < 0 ? (
+                  <div className="text-[11px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-100/50 flex flex-wrap items-center gap-1.5 w-fit mt-1">
+                    <MapPin size={10} className="shrink-0" />
+                    <span>{t('shipment.transfer_to') || '转运至'}: {warehouses?.find(w => w.wid === record.soid || w.wid === -Math.abs(record.soid) || w.wid === Math.abs(record.soid))?.wname || '未知仓库'}</span>
+                  </div>
+                ) : record.soid && record.soid > 0 ? (
+                  <div className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50 flex items-center gap-1.5 flex-wrap w-fit mt-1">
+                    <MapPin size={10} className="shrink-0" />
+                    <span>{t('shipment.destination') || '目的地'}: {destinations?.find(d => d.did === record.sdest)?.dname || '未知'}</span>
+                    <span className="text-slate-300">|</span>
+                    <span>{t('shipment.order_subject') || '订单主体'}: {orders?.find(o => o.oid === record.soid)?.ocname || '未知'}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-slate-500 truncate mt-1">
+                    <MapPin size={10} /> {destinations?.find(d => d.did === record.sdest)?.dname}
+                  </div>
+                )}
               </div>
 
               <div className="bg-slate-50 p-2 rounded-lg">
@@ -221,7 +354,7 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
             </motion.div>
           );
         })}
-        {filteredRecords.length === 0 && (
+        {unifiedHistory.length === 0 && (
           <div className="text-center py-12 text-slate-400 text-sm italic font-medium">
             {t('shipment.no_records')}
           </div>

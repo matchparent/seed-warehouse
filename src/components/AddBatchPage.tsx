@@ -95,9 +95,6 @@ export default function AddBatchPage({ onBack }: { onBack: () => void }) {
               onChange={e => setFormData({...formData, bware: e.target.value})}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-bold"
             >
-              <option value="">选择仓库 / Select Warehouse</option>
-              {/* Also support wid=1 in selector fallback just in case */}
-              <option value="1">默认/主仓库 (Main Warehouse)</option>
               {warehouses?.map(w => {
                 const dest = destinations?.find(d => d.did === w.wlocation);
                 const destLabel = dest ? dest.dname : `Location ${w.wlocation}`;

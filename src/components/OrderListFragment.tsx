@@ -21,7 +21,8 @@ import {
   Clock,
   ExternalLink,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useI18n } from '../lib/i18n';
@@ -63,8 +64,8 @@ export default function OrderListFragment({ onAdd, onEditOrder }: { onAdd: () =>
       case OrderStatus.DEPOSIT_PAID: return t('status.deposit_paid');
       case OrderStatus.FULL_PAID: return t('status.full_paid');
       case OrderStatus.COMPLETED: return t('status.completed');
-      case OrderStatus.REFUNDED: return t('status.refunded');
       case OrderStatus.DELETED: return t('status.deleted');
+      case OrderStatus.REFUNDED: return t('status.refunded');
       default: return 'Unknown';
     }
   };
@@ -176,7 +177,7 @@ function OrderCard({ order, t, destName, typeName, statusName, varieties, curren
               order.status === OrderStatus.DEPOSIT_PAID ? "bg-cyan-100 text-cyan-600" :
               order.status === OrderStatus.FULL_PAID ? "bg-purple-100 text-purple-600" :
               order.status === OrderStatus.COMPLETED ? "bg-emerald-100 text-emerald-600" :
-              order.status === OrderStatus.REFUNDED ? "bg-red-100 text-red-600" :
+              order.status === OrderStatus.REFUNDED ? "bg-rose-100 text-rose-600" :
               "bg-slate-100 text-slate-500"
             )}>{statusName}</span>
             <span className={cn(
@@ -245,6 +246,13 @@ function OrderCard({ order, t, destName, typeName, statusName, varieties, curren
             <p className="text-xs font-bold text-slate-700 truncate">{order.oarr} {getCurrencyShortSymbol(order.oarpc || 1)}</p>
           </div>
         )}
+
+        {order.status === OrderStatus.REFUNDED && order.orf && (
+          <div className="space-y-1 text-right col-start-2">
+            <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">已退金额 / Refunded</p>
+            <p className="text-xs font-black text-rose-600 truncate">-{order.orf} {getCurrencyShortSymbol(order.orfc || 1)}</p>
+          </div>
+        )}
       </div>
 
       {order.omemo && (
@@ -254,7 +262,7 @@ function OrderCard({ order, t, destName, typeName, statusName, varieties, curren
         </div>
       )}
 
-      {order.status >= OrderStatus.FULL_PAID && (
+      {order.status >= OrderStatus.FULL_PAID && order.status !== OrderStatus.REFUNDED && (
         <div className="space-y-2 pt-1">
           <div className="flex justify-between items-end">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('order.delivery_progress')}</p>
@@ -592,6 +600,10 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
   const { t } = useI18n();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showContractModal, setShowContractModal] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showRefundConfirm, setShowRefundConfirm] = useState(false);
+  const [refundAmt, setRefundAmt] = useState('');
+  const [refundCur, setRefundCur] = useState(1);
   const orders = useOrders();
   const order = orders?.find(o => o.oid === oid);
 
@@ -648,14 +660,26 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
         <div className="grid gap-2">
           <OptionButton icon={<Edit2 size={18} />} label={order.status >= OrderStatus.DEPOSIT_PAID ? t('action.edit_info') : t('action.edit_base_info')} onClick={onEdit} />
           
-          {(order.status >= OrderStatus.SIGNED || order.status === OrderStatus.INTENTIONAL) && (
+          {(order.status >= OrderStatus.SIGNED || order.status === OrderStatus.INTENTIONAL) && order.status !== OrderStatus.REFUNDED && (
              <OptionButton icon={<FileText size={18} />} label={t('action.update_contract')} onClick={() => setShowContractModal(true)} />
           )}
 
-          {order.oconfn && (
+          {order.oconfn && order.status !== OrderStatus.REFUNDED && (
             <>
               <OptionButton icon={<Download size={18} />} label={t('action.download_contract')} onClick={handleDownload} />
             </>
+          )}
+
+          {(order.status === OrderStatus.DEPOSIT_PAID || order.status === OrderStatus.FULL_PAID || order.status === OrderStatus.COMPLETED) && (
+            <OptionButton 
+              icon={<RotateCcw size={18} />} 
+              label="申请退款 / Refund order" 
+              onClick={() => {
+                setRefundAmt(order.oarp || order.oard || order.otr || '');
+                setRefundCur(order.oarpc || order.otrc || 1);
+                setShowRefundModal(true);
+              }} 
+            />
           )}
 
           <OptionButton 
@@ -684,6 +708,84 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
 
       {showContractModal && (
         <OrderDetailsModal order={{...order, status: OrderStatus.INTENTIONAL}} onClose={() => setShowContractModal(false)} onUpdate={() => { setShowContractModal(false); onClose(); }} />
+      )}
+
+      {showRefundModal && (
+        <Modal title="申请退款 / Refund" onClose={() => setShowRefundModal(false)}>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase">退款金额 / Refund Amount</label>
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  step="any"
+                  min="0"
+                  value={refundAmt}
+                  onChange={e => setRefundAmt(e.target.value)}
+                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                  placeholder="请输入退款金额"
+                />
+                <select 
+                  value={refundCur} 
+                  onChange={e => setRefundCur(Number(e.target.value))}
+                  className="bg-slate-50 border border-slate-100 rounded-2xl px-2 text-xs font-bold focus:outline-none"
+                >
+                  <option value={1}>{t('currency.uzs')}</option>
+                  <option value={2}>{t('currency.usd')}</option>
+                  <option value={3}>{t('currency.cny')}</option>
+                </select>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => {
+                if (!refundAmt || isNaN(Number(refundAmt)) || Number(refundAmt) <= 0) {
+                  alert("请输入有效的且大于0的退款金额！");
+                  return;
+                }
+                setShowRefundConfirm(true);
+              }}
+              className="w-full py-4 bg-slate-900 text-white rounded-3xl font-black shadow-xl shadow-slate-200"
+            >
+              确定 / Confirm
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showRefundConfirm && (
+        <Modal title="确认退款 / Confirm Refund" onClose={() => setShowRefundConfirm(false)}>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-rose-600 bg-rose-50 p-4 rounded-3xl">
+              <AlertCircle size={24} className="shrink-0" />
+              <p className="text-xs font-bold leading-relaxed">确定要对此订单进行退款吗？退款后，订单状态将直接变更为“已退款”。</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowRefundConfirm(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">{t('action.no')}</button>
+              <button 
+                onClick={async () => {
+                  try {
+                    const orderData = {
+                      ...order,
+                      status: OrderStatus.REFUNDED,
+                      orf: refundAmt,
+                      orfc: refundCur
+                    };
+                    await dataService.updateOrder(order.oid!, orderData);
+                    setShowRefundConfirm(false);
+                    setShowRefundModal(false);
+                    onClose();
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }} 
+                className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-bold"
+              >
+                {t('action.ok')}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </>
   );

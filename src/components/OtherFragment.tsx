@@ -59,17 +59,130 @@ export default function OtherFragment() {
       return String(val).replace(/'/g, "''");
     };
 
-    // Schema
-    sql += `CREATE TABLE tab_variaty (vid INTEGER PRIMARY KEY AUTO_INCREMENT, vname TEXT);\n`;
-    sql += `CREATE TABLE tab_destination (did INTEGER PRIMARY KEY AUTO_INCREMENT, dname TEXT);\n`;
-    sql += `CREATE TABLE tab_batch (bid INTEGER PRIMARY KEY AUTO_INCREMENT, bname TEXT, bvid INTEGER, bdate TEXT, bowei DECIMAL(10,3), bcwei DECIMAL(10,3), bstatus INTEGER, bcli TEXT, bmemo TEXT, bware INTEGER);\n`;
-    sql += `CREATE TABLE tab_sending_record (sid INTEGER PRIMARY KEY AUTO_INCREMENT, sstate INTEGER, splate TEXT, spinfo TEXT, sainfo TEXT, sdate TEXT, sftime TEXT, sdrpn TEXT, sdest INTEGER, smemo TEXT, soid INTEGER, sware INTEGER);\n`;
-    sql += `CREATE TABLE tab_order_status (osid INTEGER PRIMARY KEY AUTO_INCREMENT, oscname TEXT, osuname TEXT, osename TEXT);\n`;
-    sql += `CREATE TABLE tab_order_custom (ocid INTEGER PRIMARY KEY AUTO_INCREMENT, occname TEXT, ocuname TEXT, ocename TEXT);\n`;
-    sql += `CREATE TABLE tab_orders (oid INTEGER PRIMARY KEY AUTO_INCREMENT, status INTEGER, ocdate TEXT, odest INTEGER, octype INTEGER, ocname TEXT, ocphone TEXT, otr TEXT, otrc INTEGER, ossgi TEXT, oconid TEXT, oconfn TEXT, oarp TEXT, oard TEXT, oarr TEXT, oarpc INTEGER, ogsented TEXT, omemo TEXT);\n`;
-    sql += `CREATE TABLE tab_user (uid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`key\` TEXT);\n`;
-    sql += `CREATE TABLE tab_op_record (orid INTEGER PRIMARY KEY AUTO_INCREMENT, spellname TEXT, \`desc\` TEXT, optime TEXT);\n`;
-    sql += `CREATE TABLE tab_warehouses (wid INTEGER PRIMARY KEY, wname TEXT, wlocation INTEGER);\n\n`;
+    // Schema with full table and column semantic documentation
+    sql += `-- ==========================================================\n`;
+    sql += `-- 1. tab_variaty : 棉种品种表 / Cotton Seed Varieties Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_variaty (\n`;
+    sql += `  vid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 品种ID (自增主键) / Variety unique ID\n`;
+    sql += `  vname TEXT                             -- 品种名称 / Variety display name\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 2. tab_destination : 运输目的地城市表 / Destinations Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_destination (\n`;
+    sql += `  did INTEGER PRIMARY KEY AUTO_INCREMENT, -- 目的地ID (自增主键) / Destination unique ID\n`;
+    sql += `  dname TEXT                             -- 目的地城市名称 / Destination/City name\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 3. tab_batch : 棉种物料批次表 / Cotton Seed Batches Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_batch (\n`;
+    sql += `  bid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 批次ID (自增主键) / Batch unique ID\n`;
+    sql += `  bname TEXT,                             -- 批次编号/名称 / Batch display name/serial\n`;
+    sql += `  bvid INTEGER,                           -- 关联品种ID (外键, 关联 tab_variaty.vid) / Variety relation ID\n`;
+    sql += `  bdate TEXT,                             -- 进库/录入日期 / Batch registration date\n`;
+    sql += `  bowei DECIMAL(10,3),                    -- 原始入库重量（吨） / Original batch total weight in tons\n`;
+    sql += `  bcwei DECIMAL(10,3),                    -- 当前剩余库存重量（吨） / Current remaining material stock in tons\n`;
+    sql += `  bstatus INTEGER,                        -- 质检审核状态: 0=驳回/不合格, 1=已审核安全通过, 2=转运在途待目的仓确认 / Status: 0=Rejected, 1=Approved, 2=In transit (transfer matching)\n`;
+    sql += `  bcli TEXT,                              -- 进库运输卡车车牌号 / Delivering truck license plate\n`;
+    sql += `  bmemo TEXT,                             -- 批次录入备注 / Optional batch specific remarks\n`;
+    sql += `  bware INTEGER                           -- 存储货仓ID (外键, 关联 tab_warehouses.wid) / Current storage warehouse ID\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 4. tab_sending_record : 提货与发货出库状态流转表 / Shipment & Dispatch Records Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_sending_record (\n`;
+    sql += `  sid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 发货记录ID (自增主键) / Shipment unique ID\n`;
+    sql += `  sstate INTEGER,                         -- 发货状态代码: 1=新创建, 2=已分配配置, 3=已完成核验出库, 4=已撤回撤销 / Shipment State: 1=New, 2=Allocated, 3=Completed, 4=Withdrawn\n`;
+    sql += `  splate TEXT,                            -- 提货运输车辆车牌号 / Pick-up truck license plate\n`;
+    sql += `  spinfo TEXT,                            -- 计划配置物料列表 (数据格式: "品种ID/重量(吨),品种ID/重量,...") / Planned loading: "vid/weight,vid/weight..."\n`;
+    sql += `  sainfo TEXT,                            -- 实际扣除批次配置列表 (数据格式: "批次ID/重量(吨),批次ID/重量,...") / Actual deducted batches: "bid/weight,bid/weight..."\n`;
+    sql += `  sdate TEXT,                             -- 提货日期 / Scheduled pickup date\n`;
+    sql += `  sftime TEXT,                            -- 最终核验出仓完成时间 / Outbound final completion timestamp\n`;
+    sql += `  sdrpn TEXT,                             -- 提货司机联系电话 / Driver's phone number\n`;
+    sql += `  sdest INTEGER,                          -- 目的地ID (外键, 关联 tab_destination.did) / Destination reference ID\n`;
+    sql += `  smemo TEXT,                             -- 运输出库物流备注 / Shipping dispatcher notes\n`;
+    sql += `  soid INTEGER,                           -- 关联销售订单ID (外键, 关联 tab_orders.oid) / Associated business order ID\n`;
+    sql += `  sware INTEGER                           -- 所提出的货仓网点ID (外键, 关联 tab_warehouses.wid) / Source physical warehouse ID\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 5. tab_order_status : 销售订单状态字典表 (常量定义) / Order Status Codes Definitions\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_order_status (\n`;
+    sql += `  osid INTEGER PRIMARY KEY,               -- 状态编号主键 (0=已删除, 1=有意愿, 2=已签约, 3=已付定金, 4=已付全款, 5=已完成, 6=已退款) / Numeric status code identifier\n`;
+    sql += `  oscname TEXT,                           -- 状态中文显示标签 / Chinese description\n`;
+    sql += `  osuname TEXT,                           -- 状态乌兹别克语显示标签 / Uzbek description\n`;
+    sql += `  osename TEXT                            -- 状态英语显示标签 / English description\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 6. tab_order_custom : 客户属性分类字典表 (常量定义) / Customer Type Categories Definitions\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_order_custom (\n`;
+    sql += `  ocid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 客户分类ID (自增主键, 1=政府, 2=Cluster, 3=AKIS, 4=散户, 5=机构, 6=经销商) / Customer category ID\n`;
+    sql += `  occname TEXT,                           -- 客户类别中文标签 / Chinese name\n`;
+    sql += `  ocuname TEXT,                           -- 客户类别乌兹别克语标签 / Uzbek name\n`;
+    sql += `  ocename TEXT                            -- 客户类别英语标签 / English name\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 7. tab_orders : 销售商务订单清单表 / Business Sales Orders Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_orders (\n`;
+    sql += `  oid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 订单ID (自增主键) / Order sequence ID\n`;
+    sql += `  status INTEGER,                         -- 订单状态代码 (外键, 关联 tab_order_status.osid) / Status reference key\n`;
+    sql += `  ocdate TEXT,                            -- 下单签约日期 / Contract signup date\n`;
+    sql += `  odest INTEGER,                          -- 订单交付目的城市 (外键, 关联 tab_destination.did) / Delivering destination city ID\n`;
+    sql += `  octype INTEGER,                         -- 客户属性分类ID (外键, 关联 tab_order_custom.ocid) / Customer type reference key\n`;
+    sql += `  ocname TEXT,                            -- 采购客户姓名 / 采购单位名称 / Customer or company name\n`;
+    sql += `  ocphone TEXT,                           -- 客户业务联系电话 / Customer contact phone number\n`;
+    sql += `  otr TEXT,                               -- 订单协议应收货运货款（文本数值） / Agreed amount receivables (string decimal format)\n`;
+    sql += `  otrc INTEGER,                           -- 应收款支付货币单位 (1=UZS 乌兹别克斯坦苏姆, 2=USD 美元, 3=CNY 人民币) / Currency type code for receivables\n`;
+    sql += `  ossgi TEXT,                             -- 采购意向品种和指标规定总量配额 (数据格式: "品种ID/设计需量(吨),品种ID/设计需量,...") / Demands quota list: "vid/qty,vid/qty"\n`;
+    sql += `  oconid TEXT,                            -- 签约销售合同号 / Sales contract identification reference string\n`;
+    sql += `  oconfn TEXT,                            -- 合同文本附件原始文件名 / Contract attached file logical name\n`;
+    sql += `  oarp TEXT,                              -- 销售合同实际已付总账款金额（文本数值） / Total cumulative received payments so far\n`;
+    sql += `  oard TEXT,                              -- 合同约定或已付首期定金（文本数值） / Down payment/deposit received amount\n`;
+    sql += `  oarr TEXT,                              -- 合同剩余约定尾款或最新已付尾款 / Late balance received amount\n`;
+    sql += `  oarpc INTEGER,                          -- 合同实收款计量货币单位 (1=UZS, 2=USD, 3=CNY) / Currency type code for actual cash inflow\n`;
+    sql += `  ogsented TEXT,                          -- 针对该单已累计核验出仓发货总量配额 (数据格式: "品种ID/已发量(吨),...") / Dispatched progress tracker: "vid/qty,vid/qty"\n`;
+    sql += `  omemo TEXT,                             -- 商务订单物流备注/财务说明 / Business remarks or exceptions notes\n`;
+    sql += `  orf TEXT,                               -- 退款金额 / Refund amount\n`;
+    sql += `  orfc INTEGER                            -- 退款结算货币 / Refund currency code\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 8. tab_user : 系统授权管理操作人员表 / Authorized Users Codebook\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_user (\n`;
+    sql += `  uid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 操作员用户自增主键 / Authorized operator user ID\n`;
+    sql += `  spellname TEXT,                         -- 用户姓名拼音(拼进日志和记录) / Operator login/spell name\n`;
+    sql += `  \`key\` TEXT                              -- 访问身份口令/验证安全Key / Passcode or sign-in fingerprint key\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 9. tab_op_record : 系统历史业务操作审计日志表 / Operation Audit Trail Logs\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_op_record (\n`;
+    sql += `  orid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 日志主键 / Operations logger sequence id\n`;
+    sql += `  spellname TEXT,                         -- 执行该操作的登录操作员拼音 / Responsible operator name\n`;
+    sql += `  \`desc\` TEXT,                            -- 操作事件的详细说明记录 / Plain text actions description\n`;
+    sql += `  optime TEXT                             -- 操作发生当时的时标记录 / Precise system timestamp\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 10. tab_warehouses : 授权存储分支货仓信息表 / Physical Warehouses Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_warehouses (\n`;
+    sql += `  wid INTEGER PRIMARY KEY,                -- 货仓唯一ID (主仓库默认为 -1 标识 Sino-Uzbek) / Unique warehouse code\n`;
+    sql += `  wname TEXT,                             -- 货仓网点展示名称 / Warehouse location brand name\n`;
+    sql += `  wlocation INTEGER                       -- 货仓所属的物理地级市ID (外键, 关联 tab_destination.did) / City locality mapping key\n`;
+    sql += `);\n\n`;
 
     // Data
     varieties.forEach(v => sql += `INSERT INTO tab_variaty VALUES (${v.vid}, '${esc(v.vname)}');\n`);

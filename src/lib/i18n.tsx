@@ -108,8 +108,8 @@ export const translations: Translations = {
   'status.deposit_paid': { zh: '已付定金', uz: 'Zakalat to\'langan', en: 'Deposit Paid' },
   'status.full_paid': { zh: '已付全款', uz: 'To\'liq to\'langan', en: 'Full Paid' },
   'status.completed': { zh: '已完成', uz: 'Yakunlangan', en: 'Completed' },
-  'status.refunded': { zh: '已退款', uz: 'Qaytarilgan', en: 'Refunded' },
   'status.deleted': { zh: '已删除', uz: 'O\'chirilgan', en: 'Deleted' },
+  'status.refunded': { zh: '已退款', uz: 'Qaytarilgan', en: 'Refunded' },
   'action.download_contract': { zh: '下载合同', uz: 'Shartnomani yuklab olish', en: 'Download Contract' },
   'action.edit_base_info': { zh: '编辑基本信息', uz: 'Asosiy ma\'lumotlarni tahrirlash', en: 'Edit Base Info' },
   'action.edit_info': { zh: '编辑信息', uz: 'Ma\'lumotlarni tahrirlash', en: 'Edit Info' },
@@ -209,7 +209,16 @@ export const translations: Translations = {
   'confirm.export_excel': { zh: '确定要导出已完成的出货信息 Excel 报表吗？', uz: 'Yuklash hisobotini (.xlsx) eksport qilishni tasdiqlaysizmi?', en: 'Are you sure you want to export the completed shipments Excel report?' },
   'confirm.delete_batch': { zh: '确定要删除这个批次吗？此操作不可撤销。', uz: 'O\'chirishni tasdiqlaysizmi? Bu amalni ortga qaytarib bo\'lmaydi.', en: 'Are you sure you want to delete this batch? This cannot be undone.' },
   'confirm.delete_shipment': { zh: '确定要删除这条发货记录吗？', uz: 'Ushbu yuklash yozuvini o\'chirishni tasdiqlaysizmi?', en: 'Are you sure you want to delete this shipment record?' },
-  'confirm.withdraw_shipment_desc': { zh: '撤回后，以下批次的剩余重量将恢复：', uz: 'Quyidagi partiyalarning vazni tiklanadi:', en: 'Following batch weights will be restored:' }
+  'confirm.withdraw_shipment_desc': { zh: '撤回后，以下批次的剩余重量将恢复：', uz: 'Quyidagi partiyalarning vazni tiklanadi:', en: 'Following batch weights will be restored:' },
+  'batch.supplement': { zh: '库存补充', uz: 'Zaxirani to\'ldirish', en: 'Stock Supplement' },
+  'batch.deduction': { zh: '损耗/赠予', uz: 'Yo\'qotish/Hadya', en: 'Loss/Gift' },
+  'batch.supplement.title': { zh: '库存补充', uz: 'Zaxirani to\'ldirish', en: 'Supplement Stock' },
+  'batch.deduction.title': { zh: '损耗/赠予', uz: 'Zarar / Hadyalar', en: 'Loss / Gift Deduction' },
+  'batch.modify_volume': { zh: '修改量 (t)', uz: 'O\'zgartirish miqdori (t)', en: 'Modify Weight (t)' },
+  'shipment.splate_label': { zh: '车牌号：', uz: 'Mashina raqami: ', en: 'Plate Number: ' },
+  'shipment.transfer_to': { zh: '转运至', uz: 'Yuborish: ', en: 'Transfer to' },
+  'shipment.destination': { zh: '目的地', uz: 'Manzil', en: 'Destination' },
+  'shipment.order_subject': { zh: '订单主体', uz: 'Buyurtmachi', en: 'Order Subject' }
 };
 
 interface I18nContextType {

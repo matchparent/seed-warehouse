@@ -156,7 +156,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
     if (formData.soid.startsWith('transfer:')) {
       // Transfer to another warehouse
       const destWid = parseInt(formData.soid.split(':')[1]);
-      const w = warehouses?.find(wh => wh.wid === destWid);
+      const w = warehouses?.find(wh => wh.wid === destWid || wh.wid === -Math.abs(destWid) || wh.wid === Math.abs(destWid));
       sdestValue = w ? w.wlocation : 1;
       soidValue = -Math.abs(destWid);
     } else {
