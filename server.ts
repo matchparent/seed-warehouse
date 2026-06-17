@@ -217,7 +217,7 @@ async function startServer() {
         await db.schema.createTable('tab_bankcards', (table) => {
           table.increments('bcid').primary();
           table.string('bcno').notNullable();
-          table.integer('bcbalance').notNullable();
+          table.double('bcbalance').notNullable();
           table.string('bcbaname').notNullable();
           table.integer('bcdeleted').defaultTo(0).notNullable();
         });
@@ -230,7 +230,7 @@ async function startServer() {
           table.increments('crid').primary();
           table.integer('crbcid').notNullable();
           table.string('croper').notNullable();
-          table.integer('cramount').notNullable();
+          table.double('cramount').notNullable();
           table.string('crmemo').notNullable();
           table.string('crqrcode').notNullable();
           table.integer('crscaned').defaultTo(0).notNullable();
@@ -244,6 +244,18 @@ async function startServer() {
         await db.raw('ALTER TABLE tab_batch MODIFY COLUMN bcwei DOUBLE NOT NULL');
       } catch (err) {
         console.warn('Could not alter tab_batch columns to DOUBLE:', err);
+      }
+
+      // Ensure bcbalance and cramount are DOUBLE
+      try {
+        await db.raw('ALTER TABLE tab_bankcards MODIFY COLUMN bcbalance DOUBLE NOT NULL');
+      } catch (err) {
+        console.warn('Could not alter tab_bankcards bcbalance to DOUBLE:', err);
+      }
+      try {
+        await db.raw('ALTER TABLE tab_consume_record MODIFY COLUMN cramount DOUBLE NOT NULL');
+      } catch (err) {
+        console.warn('Could not alter tab_consume_record cramount to DOUBLE:', err);
       }
 
       // Add default bware to tab_batch

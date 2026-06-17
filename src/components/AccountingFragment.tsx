@@ -48,6 +48,8 @@ export default function AccountingFragment() {
   const [showEditMemoModal, setShowEditMemoModal] = useState(false);
   const [newMemoInput, setNewMemoInput] = useState('');
   const [zoomedQrVal, setZoomedQrVal] = useState<string | null>(null);
+  const [showEditTimeModal, setShowEditTimeModal] = useState(false);
+  const [newTimeInput, setNewTimeInput] = useState('');
 
   // Add Card State
   const [addCardType, setAddCardType] = useState<'card' | 'cash'>('card');
@@ -168,7 +170,7 @@ export default function AccountingFragment() {
     e.preventDefault();
     if (!selectedCard) return;
 
-    const amountNum = parseInt(consumeAmount);
+    const amountNum = parseFloat(consumeAmount);
     if (isNaN(amountNum)) {
       alert('请输入合法的金额数字 / Please enter a valid number');
       return;
@@ -210,7 +212,7 @@ export default function AccountingFragment() {
   // Modify Card Balance Dialog triggers
   const handleSaveBalanceModify = async () => {
     if (!activeCardForAction) return;
-    const val = parseInt(newBalanceInput);
+    const val = parseFloat(newBalanceInput);
     if (isNaN(val)) {
       alert('请输入有效的金额数字 / Valid amount required');
       return;
@@ -220,7 +222,7 @@ export default function AccountingFragment() {
 
   const handleConfirmBalanceModify = async () => {
     if (!activeCardForAction) return;
-    const val = parseInt(newBalanceInput);
+    const val = parseFloat(newBalanceInput);
     try {
       await dataService.updateBankcard(activeCardForAction.bcid!, {
         bcbalance: val
@@ -269,6 +271,52 @@ export default function AccountingFragment() {
       setShowRecordActionsModal(false);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // Helper to convert date strings to YYYY-MM-DDTHH:mm for datetime-local value
+  const convertToDatetimeLocal = (dateStr: string | undefined): string => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr.replace(' ', 'T'));
+    if (isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const handleSaveTimeModify = async () => {
+    if (!activeRecordForAction) return;
+    if (!newTimeInput) {
+      alert('请选择有效的日期和时间');
+      return;
+    }
+    const date = new Date(newTimeInput);
+    if (isNaN(date.getTime())) {
+      alert('请输入有效的日期时间');
+      return;
+    }
+
+    // Format as YYYY-MM-DD HH:mm:ss
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = '00';
+    const formattedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+    try {
+      await dataService.updateConsumeRecord(activeRecordForAction.crid!, {
+        crtime: formattedTime
+      });
+      setShowEditTimeModal(false);
+      setShowRecordActionsModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('修改时间失败');
     }
   };
 
@@ -410,6 +458,7 @@ export default function AccountingFragment() {
                 <input
                   type="number"
                   min="0"
+                  step="any"
                   placeholder="请输入消费金额 (Som)"
                   value={consumeAmount}
                   onChange={(e) => setConsumeAmount(e.target.value)}
@@ -725,6 +774,7 @@ export default function AccountingFragment() {
                     <label className="text-xs text-slate-400 font-bold">初始余额 (Initial Balance - Som)</label>
                     <input
                       type="number"
+                      step="any"
                       placeholder="开卡起始余额"
                       value={addInitialBalance}
                       onChange={(e) => setAddInitialBalance(e.target.value)}
@@ -864,6 +914,7 @@ export default function AccountingFragment() {
               <div className="relative">
                 <input
                   type="number"
+                  step="any"
                   placeholder="当前账户余额 UZS"
                   value={newBalanceInput}
                   onChange={(e) => setNewBalanceInput(e.target.value)}
@@ -1022,7 +1073,26 @@ export default function AccountingFragment() {
                   </div>
                 </button>
 
-                {/* 2. ACCOUNTANT SCAN (CRSCANED) - SHOW ONLY IF NOT SCANNED */}
+                {/* 2. MODIFY TIME */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const localDt = convertToDatetimeLocal(activeRecordForAction.crtime);
+                    setNewTimeInput(localDt);
+                    setShowEditTimeModal(true);
+                  }}
+                  className="w-full p-4 hover:bg-slate-50 border border-slate-100 rounded-2xl flex items-center gap-3 cursor-pointer transition-colors text-left"
+                >
+                  <div className="w-8 h-8 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center">
+                    <Clock size={16} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-700">修改时间 (Edit Time)</div>
+                    <div className="text-[9px] text-slate-400">调整该笔记账生成的时间戳</div>
+                  </div>
+                </button>
+
+                {/* 3. ACCOUNTANT SCAN (CRSCANED) - SHOW ONLY IF NOT SCANNED */}
                 {activeRecordForAction.crscaned === 0 ? (
                   <button
                     type="button"
@@ -1084,6 +1154,52 @@ export default function AccountingFragment() {
                 <button
                   onClick={handleSaveMemoEdit}
                   className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold text-[11px] font-bold cursor-pointer"
+                >
+                  确认修改
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* MODIFY TIME DIALOG */}
+        {showEditTimeModal && activeRecordForAction && (
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              onClick={() => setShowEditTimeModal(false)}
+              className="absolute inset-0 bg-slate-900/60" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-xs p-6 rounded-3xl shadow-2xl relative z-10 overflow-hidden text-center space-y-4"
+            >
+              <h4 className="font-bold text-slate-800">修改消费记账时间</h4>
+              <p className="text-[10px] text-slate-400">请选择新的记账记录时间：</p>
+              
+              <input
+                type="datetime-local"
+                value={newTimeInput}
+                onChange={(e) => setNewTimeInput(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none font-mono text-center cursor-pointer"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditTimeModal(false)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveTimeModify}
+                  className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold text-[11px] cursor-pointer"
                 >
                   确认修改
                 </button>
