@@ -50,6 +50,16 @@ export interface OrderStatusType {
   osename: string;
 }
 
+export const STATIC_ORDER_STATUSES: OrderStatusType[] = [
+  { osid: 0, oscname: '已删除', osuname: "O'chirildi", osename: 'Deleted' },
+  { osid: 1, oscname: '有意愿', osuname: 'Iroda', osename: 'Intentional' },
+  { osid: 2, oscname: '已签约', osuname: 'Shartnoma imzolanadi', osename: 'Signed' },
+  { osid: 3, oscname: '已付定金', osuname: "Zakalat to'langan", osename: 'Deposit Paid' },
+  { osid: 4, oscname: '已付全款', osuname: "To'liq to'langan", osename: 'Full Paid' },
+  { osid: 5, oscname: '已完成', osuname: 'Tugatildi', osename: 'Completed' },
+  { osid: 6, oscname: '已退款', osuname: 'Qaytarilgan', osename: 'Refunded' }
+];
+
 export interface OrderCustomType {
   ocid: number;
   occname: string;

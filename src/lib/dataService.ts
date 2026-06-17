@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { Variety, Destination, Batch, SendingRecord, Order, OrderStatus, OrderStatusType, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord } from '../types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatus, OrderStatusType, STATIC_ORDER_STATUSES, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState, useEffect } from 'react';
 
@@ -246,9 +246,7 @@ class DataService {
   }
 
   async getOrderStatuses(): Promise<OrderStatusType[]> {
-    if (this.mode === 'dexie') return db.tab_order_status.toArray();
-    const res = await fetch('/api/tab_order_status');
-    return res.json();
+    return STATIC_ORDER_STATUSES;
   }
 
   async getOrderCustomTypes(): Promise<OrderCustomType[]> {
@@ -632,10 +630,7 @@ export function useOrders(includeDeleted = false) {
 }
 
 export function useOrderStatuses() {
-  const dexieData = useLiveQuery(() => db.tab_order_status.toArray());
-  const [mysqlData, setMysqlData] = useState<OrderStatusType[] | undefined>(undefined);
-  useEffect(() => { if (dataService.getMode() === 'mysql') dataService.getOrderStatuses().then(setMysqlData); }, []);
-  return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
+  return STATIC_ORDER_STATUSES;
 }
 
 export function useOrderCustomTypes() {

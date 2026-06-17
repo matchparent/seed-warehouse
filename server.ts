@@ -128,14 +128,8 @@ async function startServer() {
         });
       }
 
-      const hasOrderStatus = await db.schema.hasTable('tab_order_status');
-      if (!hasOrderStatus) {
-        await db.schema.createTable('tab_order_status', (table) => {
-          table.increments('osid').primary();
-          table.string('oscname').notNullable();
-          table.string('osuname').notNullable();
-          table.string('osename').notNullable();
-        });
+      if (await db.schema.hasTable('tab_order_status')) {
+        await db.schema.dropTable('tab_order_status');
       }
 
       const hasOrderCustom = await db.schema.hasTable('tab_order_custom');
@@ -303,21 +297,6 @@ async function startServer() {
         );
       }
 
-      const orderStatusCount = await db('tab_order_status').count('osid as count').first();
-      if ((orderStatusCount as any).count === 0 || (orderStatusCount as any).count !== 7) {
-        await db.raw("SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_AUTO_VALUE_ON_ZERO')").catch(() => {});
-        await db('tab_order_status').truncate().catch(() => {});
-        await db('tab_order_status').insert([
-          { osid: 0, oscname: '已删除', osuname: 'O\'chirildi', osename: 'Deleted' },
-          { osid: 1, oscname: '有意愿', osuname: 'Iroda', osename: 'Intentional' },
-          { osid: 2, oscname: '已签约', osuname: 'Shartnoma imzolanadi', osename: 'Signed' },
-          { osid: 3, oscname: '已付定金', osuname: 'Zakalat to\'langan', osename: 'Deposit Paid' },
-          { osid: 4, oscname: '已付全款', osuname: 'To\'liq to\'langan', osename: 'Full Paid' },
-          { osid: 5, oscname: '已完成', osuname: 'Tugatildi', osename: 'Completed' },
-          { osid: 6, oscname: '已退款', osuname: 'Qaytarilgan', osename: 'Refunded' }
-        ]).catch(err => console.error("Could not insert order statuses in MySQL: ", err));
-      }
-
       const orderCustomCount = await db('tab_order_custom').count('ocid as count').first();
       if ((orderCustomCount as any).count === 0 || (orderCustomCount as any).count !== 6) {
         await db('tab_order_custom').truncate().catch(() => {});
@@ -403,7 +382,6 @@ async function startServer() {
   setupTableRoutes('tab_sending_record', 'sid');
   setupTableRoutes('tab_op_record', 'orid');
   setupTableRoutes('tab_orders', 'oid');
-  setupTableRoutes('tab_order_status', 'osid');
   setupTableRoutes('tab_order_custom', 'ocid');
   setupTableRoutes('tab_warehouses', 'wid');
   setupTableRoutes('tab_batch_modify', 'bmid');

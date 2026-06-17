@@ -34,10 +34,12 @@ export default function OtherFragment() {
     const destinations = await dataService.getDestinations();
     const batches = await dataService.getBatches(false);
     const records = await dataService.getSendingRecords(false);
-    const orderStatuses = await dataService.getOrderStatuses();
     const orderCustomTypes = await dataService.getOrderCustomTypes();
     const orders = await dataService.getOrders(true);
     const warehouses = await dataService.getWarehouses();
+    const modifications = await dataService.getBatchModifications();
+    const bankcards = await dataService.getBankcards(true);
+    const consumeRecords = await dataService.getConsumeRecords();
     
     // Fetch users and logs
     let users: any[] = [];
@@ -111,17 +113,7 @@ export default function OtherFragment() {
     sql += `);\n\n`;
 
     sql += `-- ==========================================================\n`;
-    sql += `-- 5. tab_order_status : 销售订单状态字典表 (常量定义) / Order Status Codes Definitions\n`;
-    sql += `-- ==========================================================\n`;
-    sql += `CREATE TABLE tab_order_status (\n`;
-    sql += `  osid INTEGER PRIMARY KEY,               -- 状态编号主键 (0=已删除, 1=有意愿, 2=已签约, 3=已付定金, 4=已付全款, 5=已完成, 6=已退款) / Numeric status code identifier\n`;
-    sql += `  oscname TEXT,                           -- 状态中文显示标签 / Chinese description\n`;
-    sql += `  osuname TEXT,                           -- 状态乌兹别克语显示标签 / Uzbek description\n`;
-    sql += `  osename TEXT                            -- 状态英语显示标签 / English description\n`;
-    sql += `);\n\n`;
-
-    sql += `-- ==========================================================\n`;
-    sql += `-- 6. tab_order_custom : 客户属性分类字典表 (常量定义) / Customer Type Categories Definitions\n`;
+    sql += `-- 5. tab_order_custom : 客户属性分类字典表 (常量定义) / Customer Type Categories Definitions\n`;
     sql += `-- ==========================================================\n`;
     sql += `CREATE TABLE tab_order_custom (\n`;
     sql += `  ocid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 客户分类ID (自增主键, 1=政府, 2=Cluster, 3=AKIS, 4=散户, 5=机构, 6=经销商) / Customer category ID\n`;
@@ -131,11 +123,11 @@ export default function OtherFragment() {
     sql += `);\n\n`;
 
     sql += `-- ==========================================================\n`;
-    sql += `-- 7. tab_orders : 销售商务订单清单表 / Business Sales Orders Table\n`;
+    sql += `-- 6. tab_orders : 销售商务订单清单表 / Business Sales Orders Table\n`;
     sql += `-- ==========================================================\n`;
     sql += `CREATE TABLE tab_orders (\n`;
     sql += `  oid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 订单ID (自增主键) / Order sequence ID\n`;
-    sql += `  status INTEGER,                         -- 订单状态代码 (外键, 关联 tab_order_status.osid) / Status reference key\n`;
+    sql += `  status INTEGER,                         -- 订单状态代码 (0=已删除, 1=有意愿, 2=已签约, 3=已付定金, 4=已付全款, 5=已完成, 6=已退款) / Status reference key\n`;
     sql += `  ocdate TEXT,                            -- 下单签约日期 / Contract signup date\n`;
     sql += `  odest INTEGER,                          -- 订单交付目的城市 (外键, 关联 tab_destination.did) / Delivering destination city ID\n`;
     sql += `  octype INTEGER,                         -- 客户属性分类ID (外键, 关联 tab_order_custom.ocid) / Customer type reference key\n`;
@@ -184,17 +176,59 @@ export default function OtherFragment() {
     sql += `  wlocation INTEGER                       -- 货仓所属的物理地级市ID (外键, 关联 tab_destination.did) / City locality mapping key\n`;
     sql += `);\n\n`;
 
+    sql += `-- ==========================================================\n`;
+    sql += `-- 11. tab_batch_modify : 棉种批次库存手工调整与损耗记录表 / Batch Modify Record Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_batch_modify (\n`;
+    sql += `  bmid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 调整记录自增主键 / Modification log unique ID\n`;
+    sql += `  bid INTEGER,                           -- 关联批次ID (外键, 关联 tab_batch.bid) / Batch ID reference\n`;
+    sql += `  bmop INTEGER,                          -- 操作类型 (1=手工补充/加码, 2=损耗/减码) / Operation Type (1=replenish, 2=loss)\n`;
+    sql += `  bmvolume DECIMAL(10,3),                -- 数量（吨） / Adjustment amount in tons\n`;
+    sql += `  bmmemo TEXT,                           -- 调整备注 / Adjustment remarks and reasons\n`;
+    sql += `  bmdate TEXT                            -- 调整日期 / Adjustment timestamp or date\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 12. tab_bankcards : 财务管理银行卡及现金账户表 / Financial Bankcards & Accounts Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_bankcards (\n`;
+    sql += `  bcid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 卡片物理唯一ID (自增主键) / Card unique ID\n`;
+    sql += `  bcno TEXT,                              -- 账号/卡号/尾号 / Account or card number\n`;
+    sql += `  bcbalance INTEGER,                      -- 账户实时余额 / Account current balance\n`;
+    sql += `  bcbaname TEXT,                          -- 账号账户简称/开户名称 / Bankcard custom display nickname\n`;
+    sql += `  bcdeleted INTEGER DEFAULT 0             -- 逻辑删除标志 (0=正常, 1=已删除) / Soft-deletion indicator\n`;
+    sql += `);\n\n`;
+
+    sql += `-- ==========================================================\n`;
+    sql += `-- 13. tab_consume_record : 财务管理消费与支出流水记录表 / Expense/Consume Records Table\n`;
+    sql += `-- ==========================================================\n`;
+    sql += `CREATE TABLE tab_consume_record (\n`;
+    sql += `  crid INTEGER PRIMARY KEY AUTO_INCREMENT, -- 消费流水自增ID / Consume entry sequence unique ID\n`;
+    sql += `  crbcid INTEGER,                         -- 对应关联银行卡ID (外键, 关联 tab_bankcards.bcid) / Bound card ID comparison reference\n`;
+    sql += `  croper TEXT,                            -- 申请支取的操作经办员拼音姓名 / Action representative spellname\n`;
+    sql += `  cramount INTEGER,                       -- 消费金额 / Actual transaction cost amount\n`;
+    sql += `  crmemo TEXT,                            -- 消费用途备注及核对说明 / Expense detailed explanation\n`;
+    sql += `  crqrcode TEXT,                          -- 发票/收据二维码扫描纯文本值 / Raw scanned invoice/receipt QR metadata\n`;
+    sql += `  crscaned INTEGER DEFAULT 0,             -- 会计财务确认审核收录归档状态 (0=未核对收录, 1=财务已核毕入账) / Filing accounting check-off archive flag\n`;
+    sql += `  crtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- 消费时间(精确到秒) / System precise autogen timestamp\n`;
+    sql += `);\n\n`;
+
     // Data
     varieties.forEach(v => sql += `INSERT INTO tab_variaty VALUES (${v.vid}, '${esc(v.vname)}');\n`);
     destinations.forEach(d => sql += `INSERT INTO tab_destination VALUES (${d.did}, '${esc(d.dname)}');\n`);
     batches.forEach(b => sql += `INSERT INTO tab_batch VALUES (${b.bid}, '${esc(b.bname)}', ${b.bvid}, '${esc(b.bdate)}', ${b.bowei}, ${b.bcwei}, ${b.bstatus}, '${esc(b.bcli)}', '${esc(b.bmemo)}', ${b.bware !== undefined ? b.bware : -1});\n`);
     records.forEach(r => sql += `INSERT INTO tab_sending_record VALUES (${r.sid}, ${r.sstate}, '${esc(r.splate)}', '${esc(r.spinfo)}', '${esc(r.sainfo)}', '${esc(r.sdate)}', '${esc(r.sftime)}', '${esc(r.sdrpn)}', ${r.sdest}, '${esc(r.smemo)}', ${r.soid !== undefined ? r.soid : 'NULL'}, ${r.sware !== undefined ? r.sware : -1});\n`);
-    orderStatuses.forEach(os => sql += `INSERT INTO tab_order_status VALUES (${os.osid}, '${esc(os.oscname)}', '${esc(os.osuname)}', '${esc(os.osename)}');\n`);
     orderCustomTypes.forEach(oc => sql += `INSERT INTO tab_order_custom VALUES (${oc.ocid}, '${esc(oc.occname)}', '${esc(oc.ocuname)}', '${esc(oc.ocename)}');\n`);
     orders.forEach(o => sql += `INSERT INTO tab_orders VALUES (${o.oid}, ${o.status}, '${esc(o.ocdate)}', ${o.odest}, ${o.octype}, '${esc(o.ocname)}', '${esc(o.ocphone)}', '${esc(o.otr)}', ${o.otrc ?? 1}, '${esc(o.ossgi)}', '${esc(o.oconid)}', '${esc(o.oconfn)}', '${esc(o.oarp)}', '${esc(o.oard)}', '${esc(o.oarr)}', ${o.oarpc ?? 1}, '${esc(o.ogsented)}', '${esc(o.omemo)}');\n`);
     users.forEach(u => sql += `INSERT INTO tab_user VALUES (${u.uid}, '${esc(u.spellname)}', '${esc(u.key)}');\n`);
     logs.forEach(l => sql += `INSERT INTO tab_op_record VALUES (${l.orid}, '${esc(l.spellname)}', '${esc(l.desc)}', '${esc(l.optime)}');\n`);
     warehouses.forEach(w => sql += `INSERT INTO tab_warehouses VALUES (${w.wid}, '${esc(w.wname)}', ${w.wlocation});\n`);
+    modifications.forEach(bm => sql += `INSERT INTO tab_batch_modify VALUES (${bm.bmid}, ${bm.bid}, ${bm.bmop}, ${bm.bmvolume}, ${bm.bmmemo ? `'${esc(bm.bmmemo)}'` : 'NULL'}, '${esc(bm.bmdate)}');\n`);
+    bankcards.forEach(bc => sql += `INSERT INTO tab_bankcards VALUES (${bc.bcid}, '${esc(bc.bcno)}', ${bc.bcbalance}, '${esc(bc.bcbaname)}', ${bc.bcdeleted});\n`);
+    consumeRecords.forEach(cr => {
+      const escapedTime = cr.crtime ? esc(cr.crtime) : new Date().toISOString().replace('T', ' ').substring(0, 19);
+      sql += `INSERT INTO tab_consume_record (crid, crbcid, croper, cramount, crmemo, crqrcode, crscaned, crtime) VALUES (${cr.crid}, ${cr.crbcid}, '${esc(cr.croper)}', ${cr.cramount}, '${esc(cr.crmemo)}', '${esc(cr.crqrcode)}', ${cr.crscaned}, '${escapedTime}');\n`;
+    });
 
     const blob = new Blob([sql], { type: 'text/sql' });
     const url = URL.createObjectURL(blob);
