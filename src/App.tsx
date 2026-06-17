@@ -23,7 +23,8 @@ import {
   ArrowLeft,
   Search,
   Download,
-  ClipboardCheck
+  ClipboardCheck,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatWeight, formatDate, formatDateTime } from './lib/utils';
@@ -45,6 +46,7 @@ import BatchListFragment from './components/BatchListFragment';
 import OrderListFragment from './components/OrderListFragment';
 import ShipmentListFragment from './components/ShipmentListFragment';
 import StatisticsFragment from './components/StatisticsFragment';
+import AccountingFragment from './components/AccountingFragment';
 import OtherFragment from './components/OtherFragment';
 
 import { Order, OrderStatus } from './types';
@@ -190,7 +192,8 @@ export default function App() {
                     }}
                   />}
                   {activeTab === 3 && <StatisticsFragment />}
-                  {activeTab === 4 && <OtherFragment />}
+                  {activeTab === 4 && <AccountingFragment />}
+                  {activeTab === 5 && <OtherFragment />}
                 </motion.div>
               </AnimatePresence>
             </main>
@@ -200,7 +203,8 @@ export default function App() {
               <TabButton active={activeTab === 1} onClick={() => setActiveTab(1)} icon={<Package size={20} />} label={t('nav.batches')} />
               <TabButton active={activeTab === 2} onClick={() => setActiveTab(2)} icon={<Truck size={20} />} label={t('nav.shipments')} />
               <TabButton active={activeTab === 3} onClick={() => setActiveTab(3)} icon={<BarChart3 size={20} />} label={t('nav.stats')} />
-              <TabButton active={activeTab === 4} onClick={() => setActiveTab(4)} icon={<Settings size={20} />} label={t('nav.other')} />
+              <TabButton active={activeTab === 4} onClick={() => setActiveTab(4)} icon={<Wallet size={20} />} label={t('nav.accounting')} />
+              <TabButton active={activeTab === 5} onClick={() => setActiveTab(5)} icon={<Settings size={20} />} label={t('nav.other')} />
             </nav>
           </div>
         );

@@ -16,6 +16,7 @@ export const translations: Translations = {
   'nav.orders': { zh: '订单', uz: 'Buyurtmalar', en: 'Orders' },
   'nav.shipments': { zh: '发货', uz: 'Yuklash', en: 'Shipments' },
   'nav.stats': { zh: '统计', uz: 'Statistika', en: 'Stats' },
+  'nav.accounting': { zh: '记账', uz: 'Hisob-kitob', en: 'Accounting' },
   'nav.other': { zh: '其他', uz: 'Boshqalar', en: 'Other' },
   'app.title': { zh: '棉种仓储管理', uz: 'Paxta chigiti omborini boshqarish', en: 'Seed Warehouse MS' },
 

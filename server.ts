@@ -217,6 +217,32 @@ async function startServer() {
         });
       }
 
+      // Bankcard schema
+      const hasBankcards = await db.schema.hasTable('tab_bankcards');
+      if (!hasBankcards) {
+        await db.schema.createTable('tab_bankcards', (table) => {
+          table.increments('bcid').primary();
+          table.string('bcno').notNullable();
+          table.integer('bcbalance').notNullable();
+          table.string('bcbaname').notNullable();
+          table.integer('bcdeleted').defaultTo(0).notNullable();
+        });
+      }
+
+      // Consume record schema
+      const hasConsumeRecord = await db.schema.hasTable('tab_consume_record');
+      if (!hasConsumeRecord) {
+        await db.schema.createTable('tab_consume_record', (table) => {
+          table.increments('crid').primary();
+          table.integer('crbcid').notNullable();
+          table.string('croper').notNullable();
+          table.integer('cramount').notNullable();
+          table.string('crmemo').notNullable();
+          table.string('crqrcode').notNullable();
+          table.integer('crscaned').defaultTo(0).notNullable();
+        });
+      }
+
       // Ensure columns bowei and bcwei are DOUBLE instead of FLOAT to prevent rounding/double/float conversion issues
       try {
         await db.raw('ALTER TABLE tab_batch MODIFY COLUMN bowei DOUBLE NOT NULL');
@@ -371,6 +397,8 @@ async function startServer() {
   setupTableRoutes('tab_order_custom', 'ocid');
   setupTableRoutes('tab_warehouses', 'wid');
   setupTableRoutes('tab_batch_modify', 'bmid');
+  setupTableRoutes('tab_bankcards', 'bcid');
+  setupTableRoutes('tab_consume_record', 'crid');
 
   app.post("/api/auth/login", async (req, res) => {
     const { spellname, key } = req.body;

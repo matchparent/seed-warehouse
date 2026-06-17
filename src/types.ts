@@ -111,3 +111,25 @@ export interface BatchModify {
   bmmemo: string; // 备注
   bmdate: string; // 修改日期 'yyyy-MM-dd'
 }
+
+// 银行卡表 tab_bankcards
+export interface Bankcard {
+  bcid?: number;
+  bcno: string;      // 银行卡号 (若值为 "0"，则代表现金而非特定银行卡)
+  bcbalance: number;  // 余额，整数，货币为乌兹别克som
+  bcbaname: string;   // 银行名
+  bcdeleted: number;  // 是否删除了，0没有，1删除了
+}
+
+// 消费记录表 tab_consume_record
+export interface ConsumeRecord {
+  crid?: number;
+  crbcid: number;     // 消费产生卡的bcid
+  croper: string;     // 操作人，当前登录账户的name
+  cramount: number;   // 消费金额，整数，可以为负
+  crmemo: string;     // 消费说明
+  crqrcode: string;   // 发票二维码值，为空则代表没有发票
+  crscaned: number;   // 该记录是否会计已收录，默认0表示未收录，1为已收录
+}
+
+

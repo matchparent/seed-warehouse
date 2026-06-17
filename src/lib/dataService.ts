@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { Variety, Destination, Batch, SendingRecord, Order, OrderStatus, OrderStatusType, OrderCustomType, Warehouse, BatchModify } from '../types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatus, OrderStatusType, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState, useEffect } from 'react';
 
@@ -378,6 +378,123 @@ class DataService {
       bmvolume: toNum(bm.bmvolume)
     }));
   }
+
+  async getBankcards(includeDeleted = false): Promise<Bankcard[]> {
+    const toNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    };
+
+    let data: any[];
+    if (this.mode === 'dexie') {
+      data = await db.tab_bankcards.toArray();
+    } else {
+      const res = await fetch('/api/tab_bankcards');
+      data = await res.json();
+    }
+
+    const result = data.map((bc: any) => ({
+      ...bc,
+      bcid: toNum(bc.bcid),
+      bcbalance: toNum(bc.bcbalance),
+      bcdeleted: toNum(bc.bcdeleted)
+    }));
+
+    return includeDeleted ? result : result.filter((bc: any) => bc.bcdeleted !== 1);
+  }
+
+  async addBankcard(bankcard: Omit<Bankcard, 'bcid'>): Promise<number> {
+    let id: number;
+    if (this.mode === 'dexie') {
+      id = (await db.tab_bankcards.add(bankcard as Bankcard)) as number;
+    } else {
+      const res = await fetch('/api/tab_bankcards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bankcard)
+      });
+      const data = await res.json();
+      id = data.bcid;
+    }
+    await this.log(`新增银行卡/现金: ${bankcard.bcbaname} (${bankcard.bcno})`);
+    window.dispatchEvent(new CustomEvent('bankcards_changed'));
+    return id;
+  }
+
+  async updateBankcard(id: number, changes: Partial<Bankcard>): Promise<void> {
+    if (this.mode === 'dexie') {
+      await db.tab_bankcards.update(id, changes);
+    } else {
+      await fetch(`/api/tab_bankcards/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes)
+      });
+    }
+    await this.log(`更新银行卡/现金 ID ${id}: ${JSON.stringify(changes)}`);
+    window.dispatchEvent(new CustomEvent('bankcards_changed'));
+  }
+
+  async deleteBankcard(id: number): Promise<void> {
+    await this.updateBankcard(id, { bcdeleted: 1 });
+    await this.log(`删除银行卡/现金 ID ${id}`);
+    window.dispatchEvent(new CustomEvent('bankcards_changed'));
+  }
+
+  async getConsumeRecords(): Promise<ConsumeRecord[]> {
+    const toNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    };
+
+    let data: any[];
+    if (this.mode === 'dexie') {
+      data = await db.tab_consume_record.toArray();
+    } else {
+      const res = await fetch('/api/tab_consume_record');
+      data = await res.json();
+    }
+
+    return data.map((cr: any) => ({
+      ...cr,
+      crid: toNum(cr.crid),
+      crbcid: toNum(cr.crbcid),
+      cramount: toNum(cr.cramount),
+      crscaned: toNum(cr.crscaned)
+    }));
+  }
+
+  async addConsumeRecord(record: Omit<ConsumeRecord, 'crid'>): Promise<number> {
+    let id: number;
+    if (this.mode === 'dexie') {
+      id = (await db.tab_consume_record.add(record as ConsumeRecord)) as number;
+    } else {
+      const res = await fetch('/api/tab_consume_record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record)
+      });
+      const data = await res.json();
+      id = data.crid;
+    }
+    await this.log(`新增消费流水: 金额 ${record.cramount}, 说明 ${record.crmemo}`);
+    window.dispatchEvent(new CustomEvent('consume_records_changed'));
+    return id;
+  }
+
+  async updateConsumeRecord(id: number, changes: Partial<ConsumeRecord>): Promise<void> {
+    if (this.mode === 'dexie') {
+      await db.tab_consume_record.update(id, changes);
+    } else {
+      await fetch(`/api/tab_consume_record/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes)
+      });
+    }
+    await this.log(`更新消费流水 ID ${id}: ${JSON.stringify(changes)}`);
+    window.dispatchEvent(new CustomEvent('consume_records_changed'));
+  }
 }
 
 export const dataService = new DataService();
@@ -549,6 +666,65 @@ export function useBatchModifications() {
   useEffect(() => { 
     if (dataService.getMode() === 'mysql') {
       dataService.getBatchModifications().then(setMysqlData); 
+    }
+  }, [tick]);
+
+  return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
+}
+
+export function useBankcards(includeDeleted = false) {
+  const dexieData = useLiveQuery(() => 
+    db.tab_bankcards.toArray().then(data => 
+      data.map(bc => ({
+        ...bc,
+        bcid: Number(bc.bcid),
+        bcbalance: Number(bc.bcbalance),
+        bcdeleted: Number(bc.bcdeleted)
+      })).filter(bc => includeDeleted || bc.bcdeleted !== 1)
+    ), [includeDeleted]);
+
+  const [mysqlData, setMysqlData] = useState<Bankcard[] | undefined>(undefined);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const handleRefresh = () => setTick(t => t + 1);
+    window.addEventListener('bankcards_changed', handleRefresh);
+    return () => window.removeEventListener('bankcards_changed', handleRefresh);
+  }, []);
+
+  useEffect(() => {
+    if (dataService.getMode() === 'mysql') {
+      dataService.getBankcards(includeDeleted).then(setMysqlData);
+    }
+  }, [tick, includeDeleted]);
+
+  return dataService.getMode() === 'dexie' ? dexieData : mysqlData;
+}
+
+export function useConsumeRecords() {
+  const dexieData = useLiveQuery(() => 
+    db.tab_consume_record.toArray().then(data => 
+      data.map(cr => ({
+        ...cr,
+        crid: Number(cr.crid),
+        crbcid: Number(cr.crbcid),
+        cramount: Number(cr.cramount),
+        crscaned: Number(cr.crscaned)
+      }))
+    ));
+
+  const [mysqlData, setMysqlData] = useState<ConsumeRecord[] | undefined>(undefined);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const handleRefresh = () => setTick(t => t + 1);
+    window.addEventListener('consume_records_changed', handleRefresh);
+    return () => window.removeEventListener('consume_records_changed', handleRefresh);
+  }, []);
+
+  useEffect(() => {
+    if (dataService.getMode() === 'mysql') {
+      dataService.getConsumeRecords().then(setMysqlData);
     }
   }, [tick]);
 

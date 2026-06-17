@@ -4,7 +4,7 @@
  */
 
 import Dexie, { type Table } from 'dexie';
-import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType, Warehouse, BatchModify } from './types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord } from './types';
 
 export class CottonSeedDB extends Dexie {
   tab_variaty!: Table<Variety, number>;
@@ -18,6 +18,8 @@ export class CottonSeedDB extends Dexie {
   tab_op_record!: Table<{ orid?: number, spellname: string, desc: string, optime: string }, number>;
   tab_warehouses!: Table<Warehouse, number>;
   tab_batch_modify!: Table<BatchModify, number>;
+  tab_bankcards!: Table<Bankcard, number>;
+  tab_consume_record!: Table<ConsumeRecord, number>;
 
   constructor() {
     super('CottonSeedDB');
@@ -32,7 +34,9 @@ export class CottonSeedDB extends Dexie {
       tab_user: '++uid, spellname, key',
       tab_op_record: '++orid, spellname, optime',
       tab_warehouses: 'wid, wname, wlocation',
-      tab_batch_modify: '++bmid, bid, bmop, bmdate'
+      tab_batch_modify: '++bmid, bid, bmop, bmdate',
+      tab_bankcards: '++bcid, bcno, bcbaname, bcdeleted',
+      tab_consume_record: '++crid, crbcid, croper'
     });
   }
 }
