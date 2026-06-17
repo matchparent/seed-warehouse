@@ -240,6 +240,7 @@ async function startServer() {
           table.string('crmemo').notNullable();
           table.string('crqrcode').notNullable();
           table.integer('crscaned').defaultTo(0).notNullable();
+          table.timestamp('crtime').defaultTo(db.fn.now());
         });
       }
 
@@ -270,6 +271,15 @@ async function startServer() {
       }
       // Migrate existing rows with null/1/undefined sware to -1
       await db('tab_sending_record').whereNull('sware').orWhere('sware', 1).update('sware', -1);
+
+      // Add default crtime to tab_consume_record if missing
+      const columnsConsume = await db('tab_consume_record').columnInfo();
+      if (!columnsConsume.crtime) {
+        await db.schema.table('tab_consume_record', (table) => {
+          table.timestamp('crtime').defaultTo(db.fn.now());
+        });
+        await db('tab_consume_record').whereNull('crtime').update('crtime', db.fn.now());
+      }
 
       const variatyCount = await db('tab_variaty').count('vid as count').first();
       if ((variatyCount as any).count === 0) {

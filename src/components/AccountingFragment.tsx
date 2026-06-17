@@ -21,7 +21,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import { dataService, useBankcards, useConsumeRecords } from '../lib/dataService';
 import { Bankcard, ConsumeRecord } from '../types';
-import { cn } from '../lib/utils';
+import { cn, formatDateTimeWithSeconds } from '../lib/utils';
 import { QRCodeImage } from './QRCodeImage';
 
 export default function AccountingFragment() {
@@ -272,8 +272,19 @@ export default function AccountingFragment() {
     }
   };
 
-  // Filter out records related only to selectedCard
-  const activeRecords = selectedCard ? allRecords.filter(r => r.crbcid === selectedCard.bcid) : [];
+  // Filter out records related only to selectedCard and sort them by crtime desc (and/or crid desc as fallback)
+  const activeRecords = selectedCard
+    ? [...allRecords]
+        .filter(r => r.crbcid === selectedCard.bcid)
+        .sort((a, b) => {
+          const timeA = a.crtime ? new Date(a.crtime.replace(' ', 'T')).getTime() : 0;
+          const timeB = b.crtime ? new Date(b.crtime.replace(' ', 'T')).getTime() : 0;
+          if (timeA !== timeB) {
+            return timeB - timeA;
+          }
+          return (b.crid || 0) - (a.crid || 0);
+        })
+    : [];
 
   return (
     <div className="space-y-4">
@@ -558,11 +569,17 @@ export default function AccountingFragment() {
                           )}
                         </div>
                         
-                        <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                        <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400">
                           <span className="flex items-center gap-0.5">
                             <User size={10} />
                             {r.croper}
                           </span>
+                          {r.crtime && (
+                            <span className="flex items-center gap-0.5 font-mono">
+                              <Clock size={10} />
+                              {formatDateTimeWithSeconds(r.crtime)}
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -1005,8 +1022,8 @@ export default function AccountingFragment() {
                   </div>
                 </button>
 
-                {/* 2. ACCOUNTANT SCAN (CRSCANED) - SHOW ONLY IF HAS QRCODE AND NOT SCANNED */}
-                {activeRecordForAction.crqrcode && activeRecordForAction.crscaned === 0 ? (
+                {/* 2. ACCOUNTANT SCAN (CRSCANED) - SHOW ONLY IF NOT SCANNED */}
+                {activeRecordForAction.crscaned === 0 ? (
                   <button
                     type="button"
                     onClick={() => handleAccountantReviewRecord(activeRecordForAction)}
@@ -1017,14 +1034,12 @@ export default function AccountingFragment() {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-emerald-700">业务收录 (Filing Accountant)</div>
-                      <div className="text-[9px] text-emerald-400">该发票扫码已核对无误并收录</div>
+                      <div className="text-[9px] text-slate-400">确认该笔流水无误并核对收录</div>
                     </div>
                   </button>
                 ) : (
                   <div className="p-3 bg-slate-50 text-slate-400 rounded-xl text-center text-[10px]">
-                    {!activeRecordForAction.crqrcode 
-                      ? '无发票二维码无法进行财务核销收录' 
-                      : '该流水已由财务专员确认收录'}
+                    该流水已由财务专员确认收录
                   </div>
                 )}
               </div>

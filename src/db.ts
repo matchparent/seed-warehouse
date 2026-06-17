@@ -133,6 +133,15 @@ export async function initDB() {
         await db.tab_sending_record.update(r.sid!, { sware: -1 });
       }
     }
+
+    // Migrate existing client-side consume records with missing crtime
+    const consumeRecords = await db.tab_consume_record.toArray();
+    for (const cr of consumeRecords) {
+      if (!cr.crtime) {
+        const fallbackTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        await db.tab_consume_record.update(cr.crid!, { crtime: fallbackTime });
+      }
+    }
   } finally {
     isInitializing = false;
   }

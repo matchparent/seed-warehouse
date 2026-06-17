@@ -465,14 +465,20 @@ class DataService {
   }
 
   async addConsumeRecord(record: Omit<ConsumeRecord, 'crid'>): Promise<number> {
+    const defaultTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const recordWithTime = {
+      crtime: defaultTime,
+      ...record
+    };
+    
     let id: number;
     if (this.mode === 'dexie') {
-      id = (await db.tab_consume_record.add(record as ConsumeRecord)) as number;
+      id = (await db.tab_consume_record.add(recordWithTime as ConsumeRecord)) as number;
     } else {
       const res = await fetch('/api/tab_consume_record', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(record)
+        body: JSON.stringify(recordWithTime)
       });
       const data = await res.json();
       id = data.crid;

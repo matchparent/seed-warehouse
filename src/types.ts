@@ -130,6 +130,7 @@ export interface ConsumeRecord {
   crmemo: string;     // 消费说明
   crqrcode: string;   // 发票二维码值，为空则代表没有发票
   crscaned: number;   // 该记录是否会计已收录，默认0表示未收录，1为已收录
+  crtime?: string;    // 消费产生时间，精确到秒
 }
 
 

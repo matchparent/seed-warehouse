@@ -82,6 +82,28 @@ export function formatDateTime(dateStr: string): string {
   });
 }
 
+export function formatDateTimeWithSeconds(dateStr: string): string {
+  if (!dateStr) return '-';
+  let date = new Date(dateStr);
+  if (isNaN(date.getTime())) {
+    // Attempt normalization for SQLite ISO space vs T separation
+    const normalized = dateStr.replace(' ', 'T');
+    const d2 = new Date(normalized);
+    if (!isNaN(d2.getTime())) {
+      date = d2;
+    }
+  }
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+}
+
 export function getCurrencySymbol(otrc: number): string {
   if (otrc === 2) return 'USD';
   if (otrc === 3) return 'CNY';
