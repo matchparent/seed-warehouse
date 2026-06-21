@@ -2,6 +2,7 @@ import { db } from '../db';
 import { Variety, Destination, Batch, SendingRecord, Order, OrderStatus, OrderStatusType, STATIC_ORDER_STATUSES, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState, useEffect } from 'react';
+import { formatLocalDatetimeForDB } from './utils';
 
 export type DBMode = 'dexie' | 'mysql';
 
@@ -463,10 +464,10 @@ class DataService {
   }
 
   async addConsumeRecord(record: Omit<ConsumeRecord, 'crid'>): Promise<number> {
-    const defaultTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const defaultTime = record.crtime || formatLocalDatetimeForDB(new Date());
     const recordWithTime = {
-      crtime: defaultTime,
-      ...record
+      ...record,
+      crtime: defaultTime
     };
     
     let id: number;

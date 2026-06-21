@@ -21,7 +21,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import { dataService, useBankcards, useConsumeRecords } from '../lib/dataService';
 import { Bankcard, ConsumeRecord } from '../types';
-import { cn, formatDateTimeWithSeconds } from '../lib/utils';
+import { cn, formatDateTimeWithSeconds, formatLocalDatetimeForDB } from '../lib/utils';
 import { QRCodeImage } from './QRCodeImage';
 
 export default function AccountingFragment() {
@@ -61,6 +61,7 @@ export default function AccountingFragment() {
   // Add Consume Record State
   const [consumeAmount, setConsumeAmount] = useState('');
   const [consumeMemo, setConsumeMemo] = useState('');
+  const [consumeTime, setConsumeTime] = useState('');
   const [scannedQrVal, setScannedQrVal] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState('');
@@ -180,6 +181,14 @@ export default function AccountingFragment() {
       return;
     }
 
+    let finalCrTime: string | undefined = undefined;
+    if (consumeTime) {
+      const parsedDate = new Date(consumeTime);
+      if (!isNaN(parsedDate.getTime())) {
+        finalCrTime = formatLocalDatetimeForDB(parsedDate);
+      }
+    }
+
     try {
       // 1. Add Consume Record
       await dataService.addConsumeRecord({
@@ -188,7 +197,8 @@ export default function AccountingFragment() {
         cramount: amountNum,
         crmemo: consumeMemo.trim() || '无备注 (No Mem)',
         crqrcode: scannedQrVal || '',
-        crscaned: 0
+        crscaned: 0,
+        crtime: finalCrTime
       });
 
       // 2. Adjust Balance: Deduct amount from current cardamom balance (Current balance - amountNum)
@@ -200,6 +210,7 @@ export default function AccountingFragment() {
       // Reset record states
       setConsumeAmount('');
       setConsumeMemo('');
+      setConsumeTime('');
       setScannedQrVal('');
       setView('list');
       setSelectedCard(null);
@@ -279,6 +290,16 @@ export default function AccountingFragment() {
     if (!dateStr) return '';
     const date = new Date(dateStr.replace(' ', 'T'));
     if (isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  // Helper to convert Date object directly to YYYY-MM-DDTHH:mm
+  const dateToDatetimeLocal = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -370,7 +391,7 @@ export default function AccountingFragment() {
                     className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-200 transition-all cursor-pointer group flex flex-col gap-3"
                     onClick={() => {
                       setSelectedCard(bc);
-                      setView('add-record');
+                      setView('records-list');
                     }}
                   >
                     <div className="flex items-center justify-between">
@@ -396,17 +417,33 @@ export default function AccountingFragment() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveCardForAction(bc);
-                          setNewBalanceInput(String(bc.bcbalance));
-                          setShowCardActionsModal(true);
-                        }}
-                        className="p-2 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg shrink-0 transition-colors"
-                      >
-                        <MoreVertical size={16} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCard(bc);
+                            setView('add-record');
+                            setConsumeTime(dateToDatetimeLocal(new Date()));
+                          }}
+                          className="p-2 hover:bg-emerald-50 text-emerald-500 hover:text-emerald-700 rounded-lg shrink-0 transition-colors"
+                          title="新增消费 (New Expense)"
+                        >
+                          <Plus size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveCardForAction(bc);
+                            setNewBalanceInput(String(bc.bcbalance));
+                            setShowCardActionsModal(true);
+                          }}
+                          className="p-2 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg shrink-0 transition-colors"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="border-t border-slate-50 pt-2 flex items-center justify-between">
@@ -479,6 +516,17 @@ export default function AccountingFragment() {
                 value={consumeMemo}
                 onChange={(e) => setConsumeMemo(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:bg-white focus:border-emerald-300 focus:outline-none transition-all"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500">消费时间 (Time) *</label>
+              <input
+                type="datetime-local"
+                value={consumeTime}
+                onChange={(e) => setConsumeTime(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-mono focus:bg-white focus:border-emerald-300 focus:outline-none transition-all cursor-pointer"
                 required
               />
             </div>
@@ -838,24 +886,6 @@ export default function AccountingFragment() {
               </div>
 
               <div className="p-4 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCard(activeCardForAction);
-                    setView('records-list');
-                    setShowCardActionsModal(false);
-                  }}
-                  className="w-full p-4 hover:bg-slate-50 border border-slate-100 rounded-2xl flex items-center gap-3 cursor-pointer transition-colors text-left"
-                >
-                  <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
-                    <ClipboardList size={16} />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-700">消费记录 (Expenses records_list)</div>
-                    <div className="text-[9px] text-slate-400">查看此账号下的所有收支历史</div>
-                  </div>
-                </button>
-
                 <button
                   type="button"
                   onClick={() => {
