@@ -158,10 +158,10 @@ function OrderCard({ order, t, destName, typeName, statusName, varieties, curren
       animate={{ opacity: 1, y: 0 }}
       className={cn(
         "bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3 transition-all",
-        order.status < OrderStatus.FULL_PAID ? "cursor-pointer hover:border-slate-200 hover:shadow-md" : ""
+        (order.status < OrderStatus.FULL_PAID && order.status !== OrderStatus.DELETED) ? "cursor-pointer hover:border-slate-200 hover:shadow-md" : ""
       )}
       onClick={() => {
-        if (order.status < OrderStatus.FULL_PAID) {
+        if (order.status < OrderStatus.FULL_PAID && order.status !== OrderStatus.DELETED) {
           onClick();
         }
       }}
@@ -201,12 +201,14 @@ function OrderCard({ order, t, destName, typeName, statusName, varieties, curren
             </div>
           </div>
         </div>
-        <button 
-          onClick={(e) => { e.stopPropagation(); onOptions(); }}
-          className="p-2 -mr-2 text-slate-400 hover:text-slate-600 transition-colors"
-        >
-          <MoreVertical size={20} />
-        </button>
+        {order.status !== OrderStatus.DELETED && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); onOptions(); }}
+            className="p-2 -mr-2 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <MoreVertical size={20} />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-y-3 gap-x-4 pt-1">
@@ -281,7 +283,7 @@ function OrderCard({ order, t, destName, typeName, statusName, varieties, curren
         </div>
       )}
 
-      {order.status < OrderStatus.FULL_PAID && (
+      {order.status < OrderStatus.FULL_PAID && order.status !== OrderStatus.DELETED && (
         <button 
           onClick={(e) => { e.stopPropagation(); onClick(); }}
           className="w-full py-3 bg-slate-900 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2"
@@ -610,6 +612,14 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
   if (!order) return null;
 
   const handleDelete = async () => {
+    if (
+      order.status === OrderStatus.FULL_PAID ||
+      order.status === OrderStatus.COMPLETED ||
+      order.status === OrderStatus.REFUNDED
+    ) {
+      alert("该订单状态下不可删除 (This order cannot be deleted under current status)");
+      return;
+    }
     // Check if status PAID and has sent goods
     if (order.status >= OrderStatus.DEPOSIT_PAID) {
       const sent = order.ogsented.split(',').reduce((acc, s) => {
@@ -682,12 +692,16 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
             />
           )}
 
-          <OptionButton 
-            icon={<Trash2 size={18} />} 
-            label={t('action.delete_order')} 
-            onClick={() => setShowDeleteConfirm(true)} 
-            className="text-red-500" 
-          />
+          {order.status !== OrderStatus.FULL_PAID && 
+           order.status !== OrderStatus.COMPLETED && 
+           order.status !== OrderStatus.REFUNDED && (
+             <OptionButton 
+               icon={<Trash2 size={18} />} 
+               label={t('action.delete_order')} 
+               onClick={() => setShowDeleteConfirm(true)} 
+               className="text-red-500" 
+             />
+          )}
         </div>
       </Modal>
 

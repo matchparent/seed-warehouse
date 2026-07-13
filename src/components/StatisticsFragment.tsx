@@ -276,6 +276,7 @@ export default function StatisticsFragment() {
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
     return orders.filter(o => {
+      if (o.status === OrderStatus.DELETED) return false;
       const norm = normalizeDateStr(o.ocdate);
       return norm >= startDate && norm <= endDate;
     });
