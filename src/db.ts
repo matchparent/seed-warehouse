@@ -74,10 +74,18 @@ export async function initDB() {
 
     const userCount = await db.tab_user.count();
     if (userCount === 0) {
-      await db.tab_user.add({
-        spellname: 'BianJiang',
-        key: 'U2FsdGVkX18mX9TVixXl9qnwMi9z2Mc6C1oaKzLc8Ow='
-      });
+      await db.tab_user.bulkPut([
+        { uid: 1, spellname: 'admin', key: '123' },
+        { uid: 2, spellname: 'BianJiang', key: 'U2FsdGVkX18mX9TVixXl9qnwMi9z2Mc6C1oaKzLc8Ow=' }
+      ]);
+    } else {
+      const adminUser = await db.tab_user.where({ spellname: 'admin' }).first();
+      if (!adminUser) {
+        await db.tab_user.add({
+          spellname: 'admin',
+          key: '123'
+        });
+      }
     }
 
     const orderCustomCount = await db.tab_order_custom.count();

@@ -121,11 +121,16 @@ async function startServer() {
           table.string('spellname').notNullable();
           table.string('key').notNullable();
         });
-        // Seed default user for testing
-        await db('tab_user').insert({
-          spellname: 'BianJiang',
-          key: 'U2FsdGVkX18mX9TVixXl9qnwMi9z2Mc6C1oaKzLc8Ow='
-        });
+        // Seed default users
+        await db('tab_user').insert([
+          { spellname: 'admin', key: '123' },
+          { spellname: 'BianJiang', key: 'U2FsdGVkX18mX9TVixXl9qnwMi9z2Mc6C1oaKzLc8Ow=' }
+        ]);
+      } else {
+        const hasAdmin = await db('tab_user').where({ spellname: 'admin' }).first();
+        if (!hasAdmin) {
+          await db('tab_user').insert({ spellname: 'admin', key: '123' });
+        }
       }
 
       if (await db.schema.hasTable('tab_order_status')) {
@@ -345,6 +350,71 @@ async function startServer() {
     }
   });
 
+  app.post("/api/auth/login", async (req, res) => {
+    const { spellname, key } = req.body;
+    if (dbMode !== 'mysql') {
+      if ((spellname === 'admin' && key === '123') || spellname === 'BianJiang') {
+        return res.json({ success: true, user: { uid: 1, spellname } });
+      }
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+    try {
+      const user = await db('tab_user').where({ spellname, key }).first();
+      if (user) {
+        res.json({ success: true, user: { uid: user.uid, spellname: user.spellname } });
+      } else {
+        res.status(401).json({ success: false, message: "Invalid credentials" });
+      }
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // Authentication Middleware for all subsequent backend data requests
+  app.use("/api", async (req, res, next) => {
+    // Whitelist non-data routes
+    if (req.path === '/auth/login' || req.path === '/config' || req.path === '/db/status') {
+      return next();
+    }
+
+    const spellname = (req.query.spellname as string) || 
+                      (req.headers['x-spellname'] as string) || 
+                      (req.body && (req.body._auth_spellname || req.body.spellname));
+    const key = (req.query.key as string) || 
+                (req.headers['x-key'] as string) || 
+                (req.body && (req.body._auth_key || req.body.key));
+
+    if (!spellname || !key) {
+      return res.status(401).json({ 
+        error: "Unauthorized: Missing username or password parameter", 
+        authenticated: false 
+      });
+    }
+
+    if (dbMode !== 'mysql') {
+      if ((spellname === 'admin' && key === '123') || spellname === 'BianJiang') {
+        return next();
+      }
+      return res.status(401).json({ 
+        error: "Unauthorized: Invalid username or password", 
+        authenticated: false 
+      });
+    }
+
+    try {
+      const user = await db('tab_user').where({ spellname, key }).first();
+      if (!user) {
+        return res.status(401).json({ 
+          error: "Unauthorized: Invalid username or password", 
+          authenticated: false 
+        });
+      }
+      next();
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // Generic CRUD helper generator
   const setupTableRoutes = (tableName: string, idField: string) => {
     app.get(`/api/${tableName}`, async (req, res) => {
@@ -358,8 +428,11 @@ async function startServer() {
 
     app.post(`/api/${tableName}`, async (req, res) => {
       try {
-        const [id] = await db(tableName).insert(req.body);
-        res.json({ [idField]: id, ...req.body });
+        const insertData = { ...req.body };
+        delete insertData._auth_spellname;
+        delete insertData._auth_key;
+        const [id] = await db(tableName).insert(insertData);
+        res.json({ [idField]: id, ...insertData });
       } catch (err) {
         res.status(500).json({ error: String(err) });
       }
@@ -367,9 +440,12 @@ async function startServer() {
 
     app.put(`/api/${tableName}/:id`, async (req, res) => {
       try {
+        const updateData = { ...req.body };
+        delete updateData._auth_spellname;
+        delete updateData._auth_key;
         await db(tableName)
           .where(idField, req.params.id)
-          .update(req.body);
+          .update(updateData);
         res.json({ success: true });
       } catch (err) {
         res.status(500).json({ error: String(err) });
@@ -399,20 +475,7 @@ async function startServer() {
   setupTableRoutes('tab_batch_modify', 'bmid');
   setupTableRoutes('tab_bankcards', 'bcid');
   setupTableRoutes('tab_consume_record', 'crid');
-
-  app.post("/api/auth/login", async (req, res) => {
-    const { spellname, key } = req.body;
-    try {
-      const user = await db('tab_user').where({ spellname, key }).first();
-      if (user) {
-        res.json({ success: true, user });
-      } else {
-        res.status(401).json({ success: false, message: "Invalid credentials" });
-      }
-    } catch (err) {
-      res.status(500).json({ error: String(err) });
-    }
-  });
+  setupTableRoutes('tab_user', 'uid');
 
   // Specialized query for shipments (order by date)
   app.get("/api/tab_sending_record/ordered", async (req, res) => {

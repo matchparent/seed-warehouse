@@ -363,7 +363,7 @@ function OrderDetailsModal({ order, onClose, onUpdate }: { order: Order, onClose
         if (file && fileDataUrl) {
           if (isMysql) {
             const base64Data = fileDataUrl.includes('base64,') ? fileDataUrl.split('base64,')[1] : '';
-            await fetch('/api/contracts/upload', {
+            await dataService.authFetch('/api/contracts/upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

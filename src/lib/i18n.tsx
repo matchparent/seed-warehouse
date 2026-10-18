@@ -183,13 +183,13 @@ export const translations: Translations = {
   'other.language': { zh: '中/乌/英 - 语言设置', uz: 'Tilni almashtirish', en: 'Language Settings' },
 
   // Login
-  'login.title': { zh: '系统授权登录', uz: 'Tizimga kirish', en: 'System Login' },
-  'login.desc': { zh: '请上传您的 JSON 授权文件以进入系统', uz: 'JSON ruxsatnoma faylini yuklang', en: 'Upload JSON auth file to enter' },
-  'login.drop_hint': { zh: '点击或拖拽至此', uz: 'Tanlang yoki tashlang', en: 'Click or drag here' },
-  'login.json_only': { zh: '仅支持 .json', uz: 'Faqat .json', en: '.json only' },
-  'login.error.format': { zh: '无效的授权文件格式', uz: 'Fayl formati xato', en: 'Invalid format' },
-  'login.error.match': { zh: '授权信息匹配失败，请使用有效的授权文件', uz: 'Ruxsatnoma mos kelmadi', en: 'Auth mismatch' },
-  'login.error.read': { zh: '文件读取失败', uz: 'Faylni o\'qishda xato', en: 'Read error' },
+  'login.title': { zh: '系统登录', uz: 'Tizimga kirish', en: 'System Login' },
+  'login.username': { zh: '账号', uz: 'Foydalanuvchi nomi', en: 'Username' },
+  'login.password': { zh: '密码', uz: 'Parol', en: 'Password' },
+  'login.submit': { zh: '确定登录', uz: 'Kirish', en: 'Confirm Login' },
+  'login.error.empty': { zh: '请输入账号和密码', uz: 'Foydalanuvchi nomi va parolni kiriting', en: 'Please enter username and password' },
+  'login.error.invalid': { zh: '账号或密码错误', uz: 'Noto\'g\'ri foydalanuvchi nomi yoki parol', en: 'Invalid username or password' },
+  'login.error.match': { zh: '账号或密码错误，请核对后重试', uz: 'Foydalanuvchi nomi yoki parol xato', en: 'Invalid credentials' },
 
   // Allocation/Inspection Specific
   'alloc.progress': { zh: '分配进度', uz: 'Jarayon', en: 'Allocation Progress' },

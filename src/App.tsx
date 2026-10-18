@@ -60,46 +60,62 @@ export default function App() {
   const [selectedShipmentId, setSelectedShipmentId] = useState<number | null>(null);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('auth_user'));
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     async function start() {
-      await dataService.init();
       await initDB();
+      await dataService.init();
       setIsInitialized(true);
-      if (dataService.getMode() === 'dexie') {
-        setIsLoggedIn(true);
+
+      const auth = dataService.getStoredAuth();
+      if (!auth) {
+        setIsLoggedIn(false);
+        return;
+      }
+
+      try {
+        const isValid = await dataService.verifyUser(auth.spellname, auth.key);
+        if (isValid) {
+          setIsLoggedIn(true);
+        } else {
+          dataService.clearStoredAuth();
+          setIsLoggedIn(false);
+        }
+      } catch {
+        dataService.clearStoredAuth();
+        setIsLoggedIn(false);
       }
     }
     start();
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || dataService.getMode() === 'dexie') return;
+    const handleAuthRequired = () => {
+      setIsLoggedIn(false);
+    };
+    window.addEventListener('auth_required', handleAuthRequired);
+    return () => window.removeEventListener('auth_required', handleAuthRequired);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
 
     const checkAuth = async () => {
-      const userStr = localStorage.getItem('auth_user');
-      if (!userStr) {
+      const auth = dataService.getStoredAuth();
+      if (!auth) {
         setIsLoggedIn(false);
         return;
       }
       
       try {
-        const user = JSON.parse(userStr);
-        // Only verify if we have a key, otherwise we might have stale/incomplete data
-        if (!user.spellname || !user.key) {
-          localStorage.removeItem('auth_user');
-          setIsLoggedIn(false);
-          return;
-        }
-
-        const isValid = await dataService.verifyUser(user.spellname, user.key);
+        const isValid = await dataService.verifyUser(auth.spellname, auth.key);
         if (!isValid) {
-          localStorage.removeItem('auth_user');
+          dataService.clearStoredAuth();
           setIsLoggedIn(false);
         }
       } catch (e) {
-        localStorage.removeItem('auth_user');
+        dataService.clearStoredAuth();
         setIsLoggedIn(false);
       }
     };
