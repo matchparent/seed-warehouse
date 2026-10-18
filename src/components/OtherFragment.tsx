@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 import { ShipmentState } from '../types';
 import { dataService, useWarehouses, useDestinations } from '../lib/dataService';
 import { useI18n, Language } from '../lib/i18n';
-import { Database, FileSpreadsheet, Download, ShieldCheck, Languages, AlertCircle, Plus, Home } from 'lucide-react';
+import { Database, FileSpreadsheet, Download, ShieldCheck, Languages, AlertCircle, Plus, Home, HardDrive, Wifi, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState } from 'react';
@@ -277,9 +277,84 @@ export default function OtherFragment() {
     XLSX.writeFile(wb, `已完成发货信息_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const isOnline = dataService.isOnline();
+  const dbConfig = dataService.getDbConfig();
+  const currentAuth = dataService.getStoredAuth();
+  const currentUsername = currentAuth?.spellname || 'admin';
+
   return (
     <div className="space-y-6">
       <div className="grid gap-3">
+        {/* Database Operation Mode Card */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                isOnline ? "bg-emerald-50 text-emerald-600" : "bg-sky-50 text-sky-600"
+              )}>
+                {isOnline ? <Wifi size={20} /> : <HardDrive size={20} />}
+              </div>
+              <div>
+                <div className="text-sm font-bold text-slate-700">
+                  {isOnline ? '联机模式 (Online Mode)' : '单机模式 (Standalone Mode)'}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  {isOnline 
+                    ? '已根据环境变量连接远程 MySQL 数据库' 
+                    : '未配置 DB_HOST 环境变量，数据存储于客户端本地 IndexedDB'}
+                </div>
+              </div>
+            </div>
+            <span className={cn(
+              "px-3 py-1 text-xs font-bold rounded-full",
+              isOnline ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"
+            )}>
+              {isOnline ? '联机版' : '单机版'}
+            </span>
+          </div>
+
+          {isOnline && dbConfig && (
+            <div className="bg-slate-50 p-3 rounded-xl text-xs font-mono text-slate-600 space-y-1.5 border border-slate-100">
+              <div className="flex justify-between">
+                <span className="text-slate-400">主机 / Host:</span>
+                <span className="font-bold">{dbConfig.host}:{dbConfig.port}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">数据库 / Database:</span>
+                <span className="font-bold">{dbConfig.database}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">用户 / User:</span>
+                <span className="font-bold">{dbConfig.user}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Current User Card */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0 shadow-inner">
+                <User size={20} />
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 font-medium tracking-wide uppercase">
+                  当前用户 / Current User
+                </div>
+                <div className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                  <span>{currentUsername}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+              <span>已登录</span>
+            </div>
+          </div>
+        </div>
+
         {/* Active Warehouse Switching Card */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
           <div className="flex items-center gap-4">

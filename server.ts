@@ -20,35 +20,56 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
 
-  // Database initialization
-  const db = knex({
-    client: 'mysql2',
-    connection: {
-      host: process.env.DB_HOST || 'localhost',
-      port: Number(process.env.DB_PORT) || 3306,
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'cotton_seed_db',
-    },
-    useNullAsDefault: true
-  });
+  // 1. Determine Database Operating Mode from DB_HOST
+  const rawDbHost = process.env.DB_HOST ? process.env.DB_HOST.trim() : '';
+  const isOnlineMode = Boolean(rawDbHost && rawDbHost !== 'undefined' && rawDbHost !== 'null');
+  const dbMode: 'dexie' | 'mysql' = isOnlineMode ? 'mysql' : 'dexie';
 
-  const dbHost = process.env.DB_HOST;
-  const dbMode = (dbHost && dbHost !== 'undefined' && dbHost !== 'null' && dbHost.trim() !== '') ? 'mysql' : 'dexie';
+  // 2. Database Connection Configuration (only initialized when in online mode)
+  const dbConfig = isOnlineMode ? {
+    host: rawDbHost,
+    port: Number(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'cotton_seed_db',
+    connectTimeout: 10000,
+  } : null;
+
+  const db: knex.Knex = (isOnlineMode && dbConfig)
+    ? knex({
+        client: 'mysql2',
+        connection: dbConfig,
+        pool: {
+          min: 0,
+          max: 10,
+          idleTimeoutMillis: 30000
+        },
+        useNullAsDefault: true
+      })
+    : (null as unknown as knex.Knex);
 
   console.log('================================================');
   console.log(`[Server Startup] NODE_ENV: "${process.env.NODE_ENV}"`);
-  console.log(`[Server Startup] DB_HOST: "${process.env.DB_HOST}"`);
-  console.log(`[Server Startup] DB_PORT: "${process.env.DB_PORT}"`);
-  console.log(`[Server Startup] DB_USER: "${process.env.DB_USER}"`);
-  console.log(`[Server Startup] DB_NAME: "${process.env.DB_NAME}"`);
-  console.log(`[Server Startup] Calculated dbMode: "${dbMode}"`);
+  console.log(`[Server Startup] DB_HOST: "${process.env.DB_HOST || ''}"`);
+  if (isOnlineMode && dbConfig) {
+    console.log(`[Server Startup] 运行模式: 联机模式 (Online Mode - MySQL)`);
+    console.log(`[Server Startup] 数据库配置: ${dbConfig.user}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`);
+  } else {
+    console.log(`[Server Startup] 运行模式: 单机模式 (Standalone Mode - Dexie/IndexedDB)`);
+    console.log(`[Server Startup] 未检测到有效的 DB_HOST 环境变量，应用自动进入纯单机模式。`);
+  }
   console.log('================================================');
 
   // Check and create tables if MySQL is accessible
   async function initMySQL() {
-    if (dbMode !== 'mysql') return;
+    if (!isOnlineMode || !db || !dbConfig) {
+      console.log('[Server Database] 当前处于单机模式，无需连接 MySQL，使用客户端本地 IndexedDB 存储。');
+      return;
+    }
+    console.log(`[Server Database] 联机模式启动，正在连接 MySQL 数据库 (${dbConfig.host}:${dbConfig.port}/${dbConfig.database})...`);
     try {
+      await db.raw('select 1+1 as result');
+      console.log('[Server Database] MySQL 连接成功！正在检查数据表结构与默认数据...');
       const hasVariaty = await db.schema.hasTable('tab_variaty');
       if (!hasVariaty) {
         await db.schema.createTable('tab_variaty', (table) => {
@@ -338,32 +359,53 @@ async function startServer() {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.json({ dbMode });
+    res.json({ 
+      dbMode,
+      isOnline: isOnlineMode,
+      dbConfig: isOnlineMode && dbConfig ? {
+        host: dbConfig.host,
+        port: dbConfig.port,
+        user: dbConfig.user,
+        database: dbConfig.database
+      } : null
+    });
   });
 
   app.get("/api/db/status", async (req, res) => {
+    if (!isOnlineMode || !db) {
+      return res.json({ 
+        status: "standalone", 
+        mode: "dexie", 
+        message: "当前为单机模式 (未配置 DB_HOST，使用客户端本地 IndexedDB 存储)" 
+      });
+    }
     try {
       await db.raw('select 1+1 as result');
-      res.json({ status: "connected" });
+      res.json({ 
+        status: "connected", 
+        mode: "mysql", 
+        host: dbConfig?.host,
+        database: dbConfig?.database 
+      });
     } catch (err) {
-      res.status(500).json({ status: "disconnected", error: String(err) });
+      res.status(500).json({ status: "disconnected", mode: "mysql", error: String(err) });
     }
   });
 
   app.post("/api/auth/login", async (req, res) => {
     const { spellname, key } = req.body;
-    if (dbMode !== 'mysql') {
+    if (!isOnlineMode || !db) {
       if ((spellname === 'admin' && key === '123') || spellname === 'BianJiang') {
         return res.json({ success: true, user: { uid: 1, spellname } });
       }
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
+      return res.status(401).json({ success: false, message: "账号或密码错误" });
     }
     try {
       const user = await db('tab_user').where({ spellname, key }).first();
       if (user) {
         res.json({ success: true, user: { uid: user.uid, spellname: user.spellname } });
       } else {
-        res.status(401).json({ success: false, message: "Invalid credentials" });
+        res.status(401).json({ success: false, message: "账号或密码错误" });
       }
     } catch (err) {
       res.status(500).json({ error: String(err) });
@@ -391,7 +433,7 @@ async function startServer() {
       });
     }
 
-    if (dbMode !== 'mysql') {
+    if (!isOnlineMode || !db) {
       if ((spellname === 'admin' && key === '123') || spellname === 'BianJiang') {
         return next();
       }
@@ -418,6 +460,9 @@ async function startServer() {
   // Generic CRUD helper generator
   const setupTableRoutes = (tableName: string, idField: string) => {
     app.get(`/api/${tableName}`, async (req, res) => {
+      if (!isOnlineMode || !db) {
+        return res.status(400).json({ error: "当前应用处于单机模式，数据保存在客户端本地 IndexedDB" });
+      }
       try {
         const data = await db(tableName).select("*");
         res.json(data);
@@ -427,6 +472,9 @@ async function startServer() {
     });
 
     app.post(`/api/${tableName}`, async (req, res) => {
+      if (!isOnlineMode || !db) {
+        return res.status(400).json({ error: "当前应用处于单机模式，数据保存在客户端本地 IndexedDB" });
+      }
       try {
         const insertData = { ...req.body };
         delete insertData._auth_spellname;
@@ -439,6 +487,9 @@ async function startServer() {
     });
 
     app.put(`/api/${tableName}/:id`, async (req, res) => {
+      if (!isOnlineMode || !db) {
+        return res.status(400).json({ error: "当前应用处于单机模式，数据保存在客户端本地 IndexedDB" });
+      }
       try {
         const updateData = { ...req.body };
         delete updateData._auth_spellname;
@@ -453,6 +504,9 @@ async function startServer() {
     });
 
     app.delete(`/api/${tableName}/:id`, async (req, res) => {
+      if (!isOnlineMode || !db) {
+        return res.status(400).json({ error: "当前应用处于单机模式，数据保存在客户端本地 IndexedDB" });
+      }
       try {
         await db(tableName)
           .where(idField, req.params.id)
@@ -479,6 +533,9 @@ async function startServer() {
 
   // Specialized query for shipments (order by date)
   app.get("/api/tab_sending_record/ordered", async (req, res) => {
+    if (!isOnlineMode || !db) {
+      return res.status(400).json({ error: "当前为单机模式" });
+    }
     try {
       const data = await db('tab_sending_record').orderBy('sdate', 'desc');
       res.json(data);
@@ -489,6 +546,9 @@ async function startServer() {
 
   // Batch query with ordering
   app.get("/api/tab_batch/ordered", async (req, res) => {
+    if (!isOnlineMode || !db) {
+      return res.status(400).json({ error: "当前为单机模式" });
+    }
     try {
       const data = await db('tab_batch').orderBy('bdate', 'desc');
       res.json(data);

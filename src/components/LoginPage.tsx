@@ -4,12 +4,16 @@ import { dataService } from '../lib/dataService';
 import { motion, AnimatePresence } from 'motion/react';
 import { useI18n } from '../lib/i18n';
 
+import { cn } from '../lib/utils';
+
 interface LoginPageProps {
   onLoginSuccess: () => void;
 }
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const { t } = useI18n();
+  const isOnline = dataService.isOnline();
+  const dbConfig = dataService.getDbConfig();
   const [spellname, setSpellname] = useState('');
   const [key, setKey] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -62,6 +66,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             <p className="text-xs text-slate-400 font-medium">
               棉籽发运管理系统 / Cotton Seed Logistics
             </p>
+            <div className="flex justify-center pt-1">
+              <span className={cn(
+                "px-2.5 py-0.5 text-[11px] font-bold rounded-full inline-flex items-center gap-1.5",
+                isOnline ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-sky-50 text-sky-700 border border-sky-200"
+              )}>
+                <span className={cn("w-1.5 h-1.5 rounded-full", isOnline ? "bg-emerald-500" : "bg-sky-500")} />
+                {isOnline ? `联机模式 (${dbConfig?.host || 'MySQL'})` : '单机模式 (本地数据库)'}
+              </span>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

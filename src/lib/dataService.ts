@@ -11,8 +11,16 @@ export interface StoredAuth {
   key: string;
 }
 
+export interface DBConfigInfo {
+  host: string;
+  port: number;
+  user: string;
+  database: string;
+}
+
 class DataService {
   private mode: DBMode = 'dexie';
+  private dbConfig: DBConfigInfo | null = null;
   private initialized = false;
 
   async init() {
@@ -21,17 +29,27 @@ class DataService {
       const res = await fetch('/api/config');
       const data = await res.json();
       console.log('[Client Database Connection Debug] Fetched info from server:', data);
-      this.mode = data.dbMode || 'dexie';
-      console.log('[Client Database Connection Debug] Active mode is:', this.mode);
+      this.mode = data.dbMode === 'mysql' ? 'mysql' : 'dexie';
+      this.dbConfig = data.dbConfig || null;
+      console.log(`[Client Database Connection Debug] Active mode is: ${this.mode} (${this.mode === 'mysql' ? '联机模式' : '单机模式'})`);
     } catch (e) {
       console.error('[Client Database Connection Debug] Failed to fetch DB mode, defaulting to dexie', e);
       this.mode = 'dexie';
+      this.dbConfig = null;
     }
     this.initialized = true;
   }
 
   getMode(): DBMode {
     return this.mode;
+  }
+
+  isOnline(): boolean {
+    return this.mode === 'mysql';
+  }
+
+  getDbConfig(): DBConfigInfo | null {
+    return this.dbConfig;
   }
 
   getStoredAuth(): StoredAuth | null {
