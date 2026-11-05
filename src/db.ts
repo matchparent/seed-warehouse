@@ -4,7 +4,7 @@
  */
 
 import Dexie, { type Table } from 'dexie';
-import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord } from './types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatusType, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord, OpRecord } from './types';
 
 export class CottonSeedDB extends Dexie {
   tab_variaty!: Table<Variety, number>;
@@ -14,7 +14,7 @@ export class CottonSeedDB extends Dexie {
   tab_order_custom!: Table<OrderCustomType, number>;
   tab_orders!: Table<Order, number>;
   tab_user!: Table<{ uid?: number, spellname: string, key: string }, number>;
-  tab_op_record!: Table<{ orid?: number, spellname: string, desc: string, optime: string }, number>;
+  tab_op_record!: Table<OpRecord, number>;
   tab_warehouses!: Table<Warehouse, number>;
   tab_batch_modify!: Table<BatchModify, number>;
   tab_bankcards!: Table<Bankcard, number>;
@@ -35,6 +35,10 @@ export class CottonSeedDB extends Dexie {
       tab_batch_modify: '++bmid, bid, bmop, bmdate',
       tab_bankcards: '++bcid, bcno, bcbaname, bcdeleted',
       tab_consume_record: '++crid, crbcid, croper'
+    });
+    this.version(2).stores({
+      tab_op_record: '++orid, oid, spellname, optime',
+      tab_orders: '++oid, status, ocdate, odest, octype, ocreator, omodifier'
     });
   }
 }

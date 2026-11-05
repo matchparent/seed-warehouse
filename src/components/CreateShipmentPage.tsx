@@ -58,7 +58,9 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
       if (parts.length === 2) {
         const vid = parseInt(parts[0]);
         const qty = parseFloat(parts[1]);
-        if (!isNaN(vid) && !isNaN(qty)) map[vid] = qty;
+        if (!isNaN(vid) && !isNaN(qty)) {
+          map[vid] = Math.round(qty * 1000) / 1000;
+        }
       }
     });
     return map;
@@ -73,7 +75,9 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
         if (parts.length === 2) {
           const vid = parseInt(parts[0]);
           const qty = parseFloat(parts[1]);
-          if (!isNaN(vid) && !isNaN(qty)) map[vid] = qty;
+          if (!isNaN(vid) && !isNaN(qty)) {
+            map[vid] = Math.round(qty * 1000) / 1000;
+          }
         }
       });
     }
@@ -83,7 +87,7 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
   const currentlyPlannedMap = React.useMemo(() => {
     const map: { [vid: number]: number } = {};
     plannedItems.forEach(item => {
-      map[item.vid] = (map[item.vid] || 0) + item.weight;
+      map[item.vid] = Math.round(((map[item.vid] || 0) + item.weight) * 1000) / 1000;
     });
     return map;
   }, [plannedItems]);
@@ -123,9 +127,9 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
     }
     const snt = sentMap[vid] || 0;
     const plnd = currentlyPlannedMap[vid] || 0;
-    const rem = ord - snt - plnd;
+    const rem = Math.max(0, Math.round((ord - snt - plnd) * 1000) / 1000);
     if (weight > rem + 0.0001) {
-      setModalError(`超出剩余需要发货的量！该品种当前最大剩余发货量为 ${safeToFixed(rem > 0 ? rem : 0, 3)} 吨`);
+      setModalError(`超出剩余需要发货的量！该品种当前最大剩余发货量为 ${safeToFixed(rem, 3)} 吨`);
       return;
     }
     setPlannedItems([...plannedItems, { vid, weight }]);
@@ -289,17 +293,17 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
                     const vname = varieties?.find(v => v.vid === vid)?.vname || `ID ${vid}`;
                     const snt = sentMap[vid] || 0;
                     const plnd = currentlyPlannedMap[vid] || 0;
-                    const rem = reqQty - snt - plnd;
+                    const rem = Math.max(0, Math.round((reqQty - snt - plnd) * 1000) / 1000);
                     return (
                       <div key={vid} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-100 shadow-sm text-xs gap-1">
                         <span className="font-bold text-slate-700">{vname}</span>
                         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500">
-                          <span>需求: <strong className="text-slate-800 font-bold">{reqQty}t</strong></span>
-                          <span>已发: <strong className="text-slate-800 font-medium">{snt}t</strong></span>
+                          <span>需求: <strong className="text-slate-800 font-bold">{safeToFixed(reqQty, 3)}t</strong></span>
+                          <span>已发: <strong className="text-slate-800 font-medium">{safeToFixed(snt, 3)}t</strong></span>
                           {plnd > 0 && (
                             <span>本次计划: <strong className="text-emerald-600 font-bold">{safeToFixed(plnd, 3)}t</strong></span>
                           )}
-                          <span>剩余所需: <strong className={rem > 0.001 ? "text-amber-600 font-bold" : "text-slate-400 font-medium"}>{safeToFixed(rem > 0 ? rem : 0, 3)}t</strong></span>
+                          <span>剩余所需: <strong className={rem > 0.001 ? "text-amber-600 font-bold" : "text-slate-400 font-medium"}>{safeToFixed(rem, 3)}t</strong></span>
                         </div>
                       </div>
                     );
@@ -386,10 +390,10 @@ export default function CreateShipmentPage({ onBack, onCreated }: { onBack: () =
                     const ord = orderedMap[v.vid] || 0;
                     const snt = sentMap[v.vid] || 0;
                     const plnd = currentlyPlannedMap[v.vid] || 0;
-                    const rem = ord - snt - plnd;
+                    const rem = Math.max(0, Math.round((ord - snt - plnd) * 1000) / 1000);
                     return (
                       <option key={v.vid} value={v.vid}>
-                        {v.vname} (Req: {ord}t, Rem: {safeToFixed(rem > 0 ? rem : 0, 3)}t)
+                        {v.vname} (Req: {safeToFixed(ord, 3)}t, Rem: {safeToFixed(rem, 3)}t)
                       </option>
                     );
                   })}

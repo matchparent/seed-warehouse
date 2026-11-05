@@ -144,7 +144,11 @@ export default function AddOrderPage({ onBack, editOrder }: AddOrderPageProps) {
       };
 
       if (editOrder) {
-        await dataService.updateOrder(editOrder.oid!, orderData);
+        await dataService.updateOrder(
+          editOrder.oid!, 
+          orderData, 
+          `修改订单基础信息 (主体: ${orderData.ocname || '-'}, 应收: ${orderData.otr || '-'})`
+        );
       } else {
         await dataService.addOrder(orderData);
       }

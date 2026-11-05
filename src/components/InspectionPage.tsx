@@ -118,11 +118,11 @@ export default function InspectionPage({ shipmentId, onBack, onFinished }: { shi
           // Add current shipment weights to orderSent
           Object.entries(shipmentDispatched).forEach(([vidStr, weight]) => {
             const vid = parseInt(vidStr);
-            orderSent[vid] = (orderSent[vid] || 0) + weight;
+            orderSent[vid] = Math.round(((orderSent[vid] || 0) + weight) * 1000) / 1000;
           });
 
           const updatedOgsented = Object.entries(orderSent)
-            .map(([vid, qty]) => `${vid}/${qty}`)
+            .map(([vid, qty]) => `${vid}/${Math.round(qty * 1000) / 1000}`)
             .join(',');
 
           // Check if all varieties are fully shipped

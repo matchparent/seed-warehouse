@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { Variety, Destination, Batch, SendingRecord, Order, OrderStatus, OrderStatusType, STATIC_ORDER_STATUSES, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord } from '../types';
+import { Variety, Destination, Batch, SendingRecord, Order, OrderStatus, OrderStatusType, STATIC_ORDER_STATUSES, OrderCustomType, Warehouse, BatchModify, Bankcard, ConsumeRecord, OpRecord } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState, useEffect } from 'react';
 import { formatLocalDatetimeForDB } from './utils';
@@ -16,6 +16,17 @@ export interface DBConfigInfo {
   port: number;
   user: string;
   database: string;
+}
+
+export interface PublicToshkentData {
+  records: SendingRecord[];
+  varieties: Variety[];
+  destinations: Destination[];
+  orders: Order[];
+  warehouses: Warehouse[];
+  batches: Batch[];
+  serverToday?: string;
+  serverTomorrow?: string;
 }
 
 class DataService {
@@ -270,6 +281,106 @@ class DataService {
     }));
   }
 
+  async getPublicToshkentShipments(clientToday?: string): Promise<PublicToshkentData> {
+    const toNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    };
+
+    if (this.mode === 'mysql') {
+      try {
+        const queryParam = clientToday ? `?today=${encodeURIComponent(clientToday)}` : '';
+        const res = await fetch(`/api/public/send/toshkent${queryParam}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.records)) {
+            return {
+              records: json.records.map((r: any) => ({
+                ...r,
+                sid: toNum(r.sid),
+                sstate: toNum(r.sstate),
+                sdest: toNum(r.sdest),
+                soid: r.soid ? toNum(r.soid) : undefined,
+                sware: r.sware !== undefined && r.sware !== null ? toNum(r.sware) : -1
+              })),
+              varieties: json.varieties || [],
+              destinations: json.destinations || [],
+              orders: json.orders || [],
+              warehouses: json.warehouses || [],
+              batches: json.batches || [],
+              serverToday: json.serverToday,
+              serverTomorrow: json.serverTomorrow
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch from /api/public/send/toshkent, falling back to local dexie if available', e);
+      }
+    }
+
+    // Dexie mode or fallback
+    const warehouses = await db.tab_warehouses.toArray();
+    const toshkentWids = new Set<number>([-1, 1]);
+    warehouses.forEach(w => {
+      const wid = toNum(w.wid);
+      const loc = toNum(w.wlocation);
+      const name = (w.wname || '').toLowerCase();
+      if (wid === -1 || loc === 1 || name.includes('toshkent') || name.includes('塔什干')) {
+        toshkentWids.add(wid);
+      }
+    });
+
+    const now = new Date();
+    const formatYMD = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const todayStr = clientToday || formatYMD(now);
+    const tmr = new Date(now);
+    tmr.setDate(tmr.getDate() + 1);
+    const tomorrowStr = formatYMD(tmr);
+
+    const targetDates = new Set<string>([todayStr, tomorrowStr]);
+
+    const allRecords = await db.tab_sending_record.toArray();
+    const records = allRecords
+      .map(r => ({
+        ...r,
+        sid: toNum(r.sid),
+        sstate: toNum(r.sstate),
+        sdest: toNum(r.sdest),
+        soid: r.soid ? toNum(r.soid) : undefined,
+        sware: r.sware !== undefined && r.sware !== null ? toNum(r.sware) : -1
+      }))
+      .filter(r => {
+        const d = (r.sdate || '').replace(/\./g, '-').slice(0, 10);
+        if (!targetDates.has(d)) return false;
+        // Only uncompleted records (sstate 1 and 2, not 3 completed, not 4 withdrawn)
+        if (r.sstate === 3 || r.sstate === 4) return false;
+        const sw = r.sware;
+        return sw === undefined || sw === null || sw === -1 || sw === 1 || toshkentWids.has(sw);
+      })
+      .sort((a, b) => a.sdate.localeCompare(b.sdate) || (a.sid || 0) - (b.sid || 0));
+
+    const varieties = await db.tab_variaty.toArray();
+    const destinations = await db.tab_destination.toArray();
+    const batches = await db.tab_batch.toArray();
+    const orders = await db.tab_orders.toArray();
+
+    return {
+      records,
+      varieties,
+      destinations,
+      orders,
+      warehouses,
+      batches,
+      serverToday: todayStr,
+      serverTomorrow: tomorrowStr
+    };
+  }
+
   async addBatch(batch: Omit<Batch, 'bid'>): Promise<number> {
     await this.ensureAuth();
     let id: number;
@@ -400,49 +511,183 @@ class DataService {
       oid: toNum(o.oid),
       status: toNum(o.status),
       odest: toNum(o.odest),
-      octype: toNum(o.octype)
+      octype: toNum(o.octype),
+      ocreator: o.ocreator || 'admin',
+      omodifier: o.omodifier || o.ocreator || 'admin',
+      omodtime: o.omodtime || (o.ocdate ? o.ocdate : '')
     }));
 
     return includeDeleted ? result : result.filter((o: any) => o.status !== 7);
   }
 
+  async logOrderOp(oid: number, actionDesc: string): Promise<void> {
+    const auth = this.getStoredAuth();
+    const username = auth?.spellname || 'admin';
+    const nowTime = formatLocalDatetimeForDB();
+
+    const logEntry = {
+      oid: Number(oid),
+      spellname: username,
+      desc: `[订单 #${oid}] ${actionDesc}`,
+      optime: nowTime
+    };
+
+    try {
+      if (this.mode === 'dexie') {
+        await db.tab_op_record.add(logEntry);
+      } else {
+        await this.authFetch('/api/tab_op_record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(logEntry)
+        });
+      }
+    } catch (e) {
+      console.error('Failed to log order operation', e);
+    }
+  }
+
+  async getOrderOpRecords(oid: number): Promise<OpRecord[]> {
+    await this.ensureAuth();
+    let records: any[] = [];
+    if (this.mode === 'dexie') {
+      records = await db.tab_op_record.toArray();
+    } else {
+      const res = await this.authFetch('/api/tab_op_record');
+      records = await res.json();
+    }
+
+    const numOid = Number(oid);
+    let matched: OpRecord[] = records.filter((r: any) => {
+      if (r.oid && Number(r.oid) === numOid) return true;
+      if (r.desc) {
+        return (
+          r.desc.includes(`订单 #${numOid}`) ||
+          r.desc.includes(`订单 ID ${numOid}`) ||
+          r.desc.includes(`订单ID ${numOid}`) ||
+          r.desc.includes(`订单ID: ${numOid}`)
+        );
+      }
+      return false;
+    });
+
+    // If no records found, generate synthesized creation record
+    if (matched.length === 0) {
+      let order: Order | undefined;
+      if (this.mode === 'dexie') {
+        order = await db.tab_orders.get(numOid);
+      } else {
+        const all = await this.getOrders(true);
+        order = all.find(o => o.oid === numOid);
+      }
+
+      if (order) {
+        const creator = order.ocreator || 'admin';
+        const cDate = order.ocdate ? (order.ocdate.includes(':') ? order.ocdate : `${order.ocdate} 09:00:00`) : formatLocalDatetimeForDB();
+        const sName = STATIC_ORDER_STATUSES.find(s => s.osid === order!.status)?.oscname || '有意愿';
+        matched.push({
+          orid: 0,
+          oid: numOid,
+          spellname: creator,
+          desc: `创建订单: 客户 "${order.ocname || '-'}", 初始状态 [${sName}]`,
+          optime: cDate
+        });
+
+        if (order.omodtime && order.omodtime !== order.ocdate) {
+          matched.push({
+            orid: -1,
+            oid: numOid,
+            spellname: order.omodifier || creator,
+            desc: `更新订单信息: 当前状态 [${sName}]`,
+            optime: order.omodtime
+          });
+        }
+      }
+    }
+
+    return matched.sort((a, b) => (a.optime || '').localeCompare(b.optime || ''));
+  }
+
   async addOrder(order: Omit<Order, 'oid'>): Promise<number> {
     await this.ensureAuth();
+    const auth = this.getStoredAuth();
+    const username = auth?.spellname || 'admin';
+    const nowTime = formatLocalDatetimeForDB();
+
+    const orderToSave: any = {
+      ...order,
+      ocreator: order.ocreator || username,
+      omodifier: username,
+      omodtime: nowTime
+    };
+
     let id: number;
     if (this.mode === 'dexie') {
-      id = (await db.tab_orders.add(order as Order)) as number;
+      id = (await db.tab_orders.add(orderToSave as Order)) as number;
     } else {
       const res = await this.authFetch('/api/tab_orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(order)
+        body: JSON.stringify(orderToSave)
       });
       const data = await res.json();
       id = data.oid;
     }
-    await this.log(`新增订单: 客户 ${order.ocname}, 日期 ${order.ocdate}`);
+
+    const sName = STATIC_ORDER_STATUSES.find(s => s.osid === order.status)?.oscname || order.status;
+    await this.logOrderOp(
+      id, 
+      `创建订单: 客户 "${order.ocname || '-'}", 初始状态 [${sName}], 应收货款 ${order.otr || 0}`
+    );
     return id;
   }
 
-  async updateOrder(id: number, changes: Partial<Order>): Promise<void> {
+  async updateOrder(id: number, changes: Partial<Order>, customDesc?: string): Promise<void> {
     await this.ensureAuth();
+    const auth = this.getStoredAuth();
+    const username = auth?.spellname || 'admin';
+    const nowTime = formatLocalDatetimeForDB();
+
+    const changesToSave: any = {
+      ...changes,
+      omodifier: username,
+      omodtime: nowTime
+    };
+
     if (this.mode === 'dexie') {
-      await db.tab_orders.update(id, changes);
+      await db.tab_orders.update(id, changesToSave);
     } else {
       await this.authFetch(`/api/tab_orders/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(changes)
+        body: JSON.stringify(changesToSave)
       });
     }
-    await this.log(`更新订单 ID ${id}: ${JSON.stringify(changes)}`);
+
+    let desc = customDesc;
+    if (!desc) {
+      if (changes.status !== undefined) {
+        const sName = STATIC_ORDER_STATUSES.find(s => s.osid === changes.status)?.oscname || changes.status;
+        desc = `更新订单状态为 [${sName}]`;
+      } else if (changes.oconid || changes.oconfn) {
+        desc = `更新合同: 编号 "${changes.oconid || '-'}", 文件 "${changes.oconfn || '-'}"`;
+      } else if (changes.oarp || changes.oard || changes.oarr) {
+        desc = `更新收款记录: 实收 ${changes.oarp || changes.oard || changes.oarr}`;
+      } else if (changes.orf) {
+        desc = `申请退款: 金额 ${changes.orf}`;
+      } else {
+        const keys = Object.keys(changes).filter(k => k !== 'omodifier' && k !== 'omodtime');
+        desc = `修改订单信息: ${keys.join(', ')}`;
+      }
+    }
+
+    await this.logOrderOp(id, desc);
   }
 
   async deleteOrder(id: number): Promise<void> {
     await this.ensureAuth();
     // Logical delete
-    await this.updateOrder(id, { status: OrderStatus.DELETED });
-    await this.log(`删除订单 ID ${id} (逻辑删除)`);
+    await this.updateOrder(id, { status: OrderStatus.DELETED }, `删除订单 (逻辑删除)`);
   }
 
   async addBatchModify(record: Omit<BatchModify, 'bmid'>): Promise<number> {

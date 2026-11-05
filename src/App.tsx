@@ -38,6 +38,7 @@ import CreateShipmentPage from './components/CreateShipmentPage';
 import AllocationPage from './components/AllocationPage';
 import InspectionPage from './components/InspectionPage';
 import LoginPage from './components/LoginPage';
+import ToshkentPublicShipmentsPage from './components/ToshkentPublicShipmentsPage';
 import { dataService } from './lib/dataService';
 import { useI18n } from './lib/i18n';
 
@@ -61,6 +62,17 @@ export default function App() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentPath, setCurrentPath] = useState(() => {
+    return window.location.pathname.toLowerCase().replace(/\/+$/, '');
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname.toLowerCase().replace(/\/+$/, ''));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     async function start() {
@@ -132,6 +144,11 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  // Public Toshkent Dispatch Board route: /send/toshkent (no login required, no operations/filters)
+  if (currentPath === '/send/toshkent') {
+    return <ToshkentPublicShipmentsPage />;
   }
 
   if (!isLoggedIn) {

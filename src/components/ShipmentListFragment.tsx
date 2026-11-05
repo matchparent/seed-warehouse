@@ -18,7 +18,8 @@ import {
   MoreVertical,
   Edit2,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  ExternalLink
 } from 'lucide-react';
 import { cn, formatDate, safeToFixed } from '../lib/utils';
 import { ShipmentState, OrderStatus, Order, BatchModify, SendingRecord } from '../types';
@@ -129,9 +130,20 @@ export default function ShipmentListFragment({ onAdd, onEdit }: { onAdd: () => v
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold text-slate-800">
-          {t('shipment.records')}
-        </h2>
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">
+            {t('shipment.records')}
+          </h2>
+          <a
+            href="/send/toshkent"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-0.5 transition-colors border border-emerald-100"
+          >
+            <ExternalLink size={10} />
+            <span>{t('toshkent.open_board')}</span>
+          </a>
+        </div>
         <div className="flex gap-2">
           <div className="relative">
             <input 
@@ -521,13 +533,12 @@ function WithdrawShipmentModal({ sid, onClose }: { sid: number | null, onClose: 
         Object.entries(shipmentDispatched).forEach(([vidStr, weight]) => {
           const vid = parseInt(vidStr);
           if (orderSent[vid]) {
-            orderSent[vid] = orderSent[vid] - weight;
-            if (orderSent[vid] < 0) orderSent[vid] = 0;
+            orderSent[vid] = Math.max(0, Math.round((orderSent[vid] - weight) * 1000) / 1000);
           }
         });
 
         const updatedOgsented = Object.entries(orderSent)
-          .map(([vid, qty]) => `${vid}/${qty}`)
+          .map(([vid, qty]) => `${vid}/${Math.round(qty * 1000) / 1000}`)
           .join(',');
 
         const updates: Partial<Order> = {

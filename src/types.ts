@@ -89,6 +89,17 @@ export interface Order {
   omemo: string;
   orf?: string; // Refund amount (退款金额)
   orfc?: number; // Refund currency code (退款结算货币)
+  ocreator?: string; // 订单创建人用户名
+  omodifier?: string; // 订单最后修改人用户名
+  omodtime?: string; // 订单最后修改时间
+}
+
+export interface OpRecord {
+  orid?: number;
+  oid?: number;
+  spellname: string;
+  desc: string;
+  optime: string;
 }
 
 export interface Warehouse {

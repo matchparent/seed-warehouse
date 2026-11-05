@@ -129,10 +129,18 @@ async function startServer() {
       if (!hasRecordLog) {
         await db.schema.createTable('tab_op_record', (table) => {
           table.increments('orid').primary();
+          table.integer('oid');
           table.string('spellname').notNullable();
           table.text('desc').notNullable();
           table.string('optime').notNullable();
         });
+      } else {
+        const columnsOp = await db('tab_op_record').columnInfo();
+        if (!columnsOp.oid) {
+          await db.schema.table('tab_op_record', (table) => {
+            table.integer('oid');
+          });
+        }
       }
 
       const hasUser = await db.schema.hasTable('tab_user');
@@ -191,9 +199,12 @@ async function startServer() {
           table.text('omemo');
           table.string('orf'); // Refund amount
           table.integer('orfc').defaultTo(1); // Refund currency
+          table.string('ocreator'); // 创建人用户名
+          table.string('omodifier'); // 最后修改人用户名
+          table.string('omodtime'); // 最后修改时间
         });
       } else {
-        // Migration check for oard, oarr, orf, orfc
+        // Migration check for oard, oarr, orf, orfc, ocreator, omodifier, omodtime
         const columns = await db('tab_orders').columnInfo();
         if (!columns.oard) {
            await db.schema.table('tab_orders', (table) => {
@@ -205,6 +216,13 @@ async function startServer() {
            await db.schema.table('tab_orders', (table) => {
              table.string('orf');
              table.integer('orfc').defaultTo(1);
+           });
+        }
+        if (!columns.ocreator) {
+           await db.schema.table('tab_orders', (table) => {
+             table.string('ocreator');
+             table.string('omodifier');
+             table.string('omodtime');
            });
         }
       }
@@ -412,10 +430,107 @@ async function startServer() {
     }
   });
 
+  // Public route for Tashkent warehouse pending shipments (today & tomorrow) - no login required
+  app.get("/api/public/send/toshkent", async (req, res) => {
+    try {
+      if (!isOnlineMode || !db) {
+        return res.json({
+          success: true,
+          mode: 'dexie',
+          records: [],
+          varieties: [],
+          destinations: [],
+          orders: [],
+          warehouses: [],
+          batches: []
+        });
+      }
+
+      // 1. Find Tashkent warehouse IDs (wid = -1, wlocation = 1, or name matches Toshkent/塔什干)
+      const warehouses = await db('tab_warehouses').select('*');
+      const toshkentWids = warehouses
+        .filter((w: any) => Number(w.wid) === -1 || Number(w.wlocation) === 1 || String(w.wname).toLowerCase().includes('toshkent') || String(w.wname).includes('塔什干'))
+        .map((w: any) => Number(w.wid));
+      if (!toshkentWids.includes(-1)) toshkentWids.push(-1);
+      if (!toshkentWids.includes(1)) toshkentWids.push(1);
+
+      // 2. Dates: Today and Tomorrow in YYYY-MM-DD
+      const now = new Date();
+      const formatYMD = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
+      const serverToday = formatYMD(now);
+      const tmr = new Date(now);
+      tmr.setDate(tmr.getDate() + 1);
+      const serverTomorrow = formatYMD(tmr);
+
+      const targetDates = new Set<string>([serverToday, serverTomorrow]);
+      const clientToday = typeof req.query.today === 'string' ? req.query.today.trim() : '';
+      if (clientToday && /^\d{4}-\d{2}-\d{2}$/.test(clientToday)) {
+        targetDates.add(clientToday);
+        const cDate = new Date(clientToday);
+        cDate.setDate(cDate.getDate() + 1);
+        targetDates.add(formatYMD(cDate));
+      }
+      const datesList = Array.from(targetDates);
+
+      // 3. Query uncompleted shipments (sstate NOT IN (3, 4)) for Tashkent warehouse
+      const records = await db('tab_sending_record')
+        .whereIn('sdate', datesList)
+        .whereNotIn('sstate', [3, 4])
+        .where((builder) => {
+          builder.whereIn('sware', toshkentWids)
+            .orWhereNull('sware')
+            .orWhere('sware', -1)
+            .orWhere('sware', 1);
+        })
+        .orderBy('sdate', 'asc')
+        .orderBy('sid', 'asc');
+
+      // 4. Supporting lookup tables
+      const varieties = await db('tab_variaty').select('*');
+      const destinations = await db('tab_destination').select('*');
+      const batches = await db('tab_batch').select('*');
+
+      const orderIds = records
+        .map((r: any) => Number(r.soid))
+        .filter((id: number) => id && id > 0);
+
+      const orders = orderIds.length > 0
+        ? await db('tab_orders').whereIn('oid', orderIds).select('oid', 'ocname', 'ocphone', 'odest', 'ossgi', 'status')
+        : [];
+
+      res.json({
+        success: true,
+        mode: 'mysql',
+        records,
+        varieties,
+        destinations,
+        orders,
+        warehouses,
+        batches,
+        serverToday,
+        serverTomorrow
+      });
+    } catch (err) {
+      console.error("Error fetching public toshkent shipments:", err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // Authentication Middleware for all subsequent backend data requests
   app.use("/api", async (req, res, next) => {
-    // Whitelist non-data routes
-    if (req.path === '/auth/login' || req.path === '/config' || req.path === '/db/status') {
+    // Whitelist non-data and public routes
+    if (
+      req.path === '/auth/login' || 
+      req.path === '/config' || 
+      req.path === '/db/status' ||
+      req.path.startsWith('/public/')
+    ) {
       return next();
     }
 

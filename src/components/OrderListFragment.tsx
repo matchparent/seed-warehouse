@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -22,7 +22,13 @@ import {
   ExternalLink,
   ChevronRight,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  X,
+  SlidersHorizontal,
+  ChevronDown,
+  User,
+  UserCheck,
+  History
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useI18n } from '../lib/i18n';
@@ -34,7 +40,7 @@ import {
   useVarieties,
   dataService
 } from '../lib/dataService';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, OpRecord } from '../types';
 import { cn, formatWeight, formatDate, formatSimpleDate, getCurrencySymbol, getCurrencyShortSymbol } from '../lib/utils';
 
 export default function OrderListFragment({ onAdd, onEditOrder }: { onAdd: () => void, onEditOrder: (order: Order) => void }) {
@@ -46,15 +52,49 @@ export default function OrderListFragment({ onAdd, onEditOrder }: { onAdd: () =>
   const varieties = useVarieties();
 
   const [search, setSearch] = useState('');
+  const [selectedDest, setSelectedDest] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOptionsId, setShowOptionsId] = useState<number | null>(null);
 
+  const activeFilterCount = (selectedDest !== 'all' ? 1 : 0) + 
+                            (selectedType !== 'all' ? 1 : 0) + 
+                            (selectedStatus !== 'all' ? 1 : 0);
+  const hasActiveFilters = search.trim() !== '' || activeFilterCount > 0;
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setSelectedDest('all');
+    setSelectedType('all');
+    setSelectedStatus('all');
+  };
+
   const filteredOrders = orders?.filter(o => {
-    const dest = destinations?.find(d => d.did === o.odest)?.dname || '';
-    const match = o.ocname.toLowerCase().includes(search.toLowerCase()) || 
-                  dest.toLowerCase().includes(search.toLowerCase()) ||
-                  o.oconid?.toLowerCase().includes(search.toLowerCase());
-    return match;
+    // 1. 订单主体名称模糊搜索
+    if (search.trim()) {
+      const keyword = search.trim().toLowerCase();
+      const matchName = (o.ocname || '').toLowerCase().includes(keyword);
+      if (!matchName) return false;
+    }
+
+    // 2. 目的地筛选
+    if (selectedDest !== 'all') {
+      if (Number(o.odest) !== Number(selectedDest)) return false;
+    }
+
+    // 3. 客户类型筛选
+    if (selectedType !== 'all') {
+      if (Number(o.octype) !== Number(selectedType)) return false;
+    }
+
+    // 4. 订单进度筛选
+    if (selectedStatus !== 'all') {
+      if (Number(o.status) !== Number(selectedStatus)) return false;
+    }
+
+    return true;
   });
 
   const getStatusName = (osid: number) => {
@@ -84,30 +124,215 @@ export default function OrderListFragment({ onAdd, onEditOrder }: { onAdd: () =>
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <button 
-          onClick={onAdd}
-          className="bg-emerald-500 text-white p-2.5 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-colors shrink-0"
-        >
-          <Plus size={20} />
-        </button>
+      {/* Top Search & Filter Bar */}
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-2">
+          {/* Search Input for Order Subject Name */}
+          <div className="relative flex-1 flex items-center">
+            <Search size={18} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('order.search_placeholder') || '搜索订单主体名称...'}
+              className="w-full pl-10 pr-9 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 shadow-sm transition-all"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-3 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="清空搜索"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Toggle Filter Panel Button */}
+          <button
+            type="button"
+            onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+            className={cn(
+              "p-2.5 rounded-2xl border transition-all flex items-center justify-center shrink-0 shadow-sm relative cursor-pointer",
+              isFilterExpanded || activeFilterCount > 0
+                ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+            )}
+            title={t('order.filter_title') || '订单筛选'}
+          >
+            <SlidersHorizontal size={18} />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center shadow">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* Add Order Button */}
+          <button 
+            onClick={onAdd}
+            className="bg-emerald-500 text-white p-2.5 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-600 active:scale-95 transition-all shrink-0 flex items-center justify-center cursor-pointer"
+            title={t('order.add') || '新增订单'}
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
+        {/* Collapsible Filter Panel */}
+        <AnimatePresence>
+          {isFilterExpanded && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2.5">
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Destination Filter */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1 block truncate">
+                      {t('order.dest') || '目的地'}
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedDest}
+                        onChange={(e) => setSelectedDest(e.target.value)}
+                        className={cn(
+                          "w-full bg-slate-50 border rounded-xl pl-2.5 pr-6 py-2 text-xs font-semibold focus:outline-none transition-colors appearance-none truncate cursor-pointer",
+                          selectedDest !== 'all' 
+                            ? "border-emerald-300 text-emerald-700 bg-emerald-50/50" 
+                            : "border-slate-200 text-slate-700 focus:border-emerald-500"
+                        )}
+                      >
+                        <option value="all">{t('order.all_dest') || '全部目的地'}</option>
+                        {destinations?.map(d => (
+                          <option key={d.did} value={String(d.did)}>{d.dname}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Customer Type Filter */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1 block truncate">
+                      {t('order.custom_type') || '客户类型'}
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedType}
+                        onChange={(e) => setSelectedType(e.target.value)}
+                        className={cn(
+                          "w-full bg-slate-50 border rounded-xl pl-2.5 pr-6 py-2 text-xs font-semibold focus:outline-none transition-colors appearance-none truncate cursor-pointer",
+                          selectedType !== 'all' 
+                            ? "border-emerald-300 text-emerald-700 bg-emerald-50/50" 
+                            : "border-slate-200 text-slate-700 focus:border-emerald-500"
+                        )}
+                      >
+                        <option value="all">{t('order.all_types') || '全部客户类型'}</option>
+                        {customTypes?.map(ct => (
+                          <option key={ct.ocid} value={String(ct.ocid)}>{getCustomTypeName(ct.ocid)}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Order Progress / Status Filter */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1 block truncate">
+                      {t('order.delivery_progress') || '订单进度'}
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedStatus}
+                        onChange={(e) => setSelectedStatus(e.target.value)}
+                        className={cn(
+                          "w-full bg-slate-50 border rounded-xl pl-2.5 pr-6 py-2 text-xs font-semibold focus:outline-none transition-colors appearance-none truncate cursor-pointer",
+                          selectedStatus !== 'all' 
+                            ? "border-emerald-300 text-emerald-700 bg-emerald-50/50" 
+                            : "border-slate-200 text-slate-700 focus:border-emerald-500"
+                        )}
+                      >
+                        <option value="all">{t('order.all_statuses') || '全部订单进度'}</option>
+                        {statuses?.map(st => (
+                          <option key={st.osid} value={String(st.osid)}>{getStatusName(st.osid)}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Summary & Reset Button */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-50 text-[11px]">
+                  <span className="text-slate-400 font-medium">
+                    找到 <span className="font-bold text-slate-700">{filteredOrders?.length || 0}</span> 笔订单
+                    {orders && orders.length !== (filteredOrders?.length || 0) && (
+                      <span className="text-slate-400"> (共 {orders.length} 笔)</span>
+                    )}
+                  </span>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-bold transition-colors cursor-pointer"
+                    >
+                      <RotateCcw size={12} />
+                      <span>{t('order.reset_filter') || '重置筛选'}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
+      {/* Orders List / Empty State */}
       <div className="grid gap-3 pb-24">
-        {filteredOrders?.map(order => (
-          <OrderCard 
-            key={order.oid} 
-            order={order} 
-            t={t}
-            destName={getDestinationName(order.odest)}
-            typeName={getCustomTypeName(order.octype)}
-            statusName={getStatusName(order.status)}
-            varieties={varieties || []}
-            currency={getCurrencySymbol(order.otrc)}
-            onClick={() => setSelectedOrder(order)}
-            onOptions={() => setShowOptionsId(order.oid || null)}
-          />
-        ))}
+        {filteredOrders && filteredOrders.length > 0 ? (
+          filteredOrders.map(order => (
+            <OrderCard 
+              key={order.oid} 
+              order={order} 
+              t={t}
+              destName={getDestinationName(order.odest)}
+              typeName={getCustomTypeName(order.octype)}
+              statusName={getStatusName(order.status)}
+              varieties={varieties || []}
+              currency={getCurrencySymbol(order.otrc)}
+              onClick={() => setSelectedOrder(order)}
+              onOptions={() => setShowOptionsId(order.oid || null)}
+            />
+          ))
+        ) : (
+          <div className="bg-white rounded-3xl p-8 border border-slate-100 text-center space-y-3 shadow-sm">
+            <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center mx-auto">
+              <Search size={22} />
+            </div>
+            <div className="text-sm font-bold text-slate-700">
+              {hasActiveFilters ? (t('order.no_matching') || '未找到符合条件的订单') : '暂无订单记录'}
+            </div>
+            <p className="text-xs text-slate-400 max-w-xs mx-auto">
+              {hasActiveFilters 
+                ? '尝试修改搜索关键词或重置筛选条件' 
+                : '点击上方“+”按钮创建第一笔新订单'}
+            </p>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors cursor-pointer"
+              >
+                <RotateCcw size={14} />
+                <span>{t('order.reset_filter') || '重置筛选'}</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {selectedOrder && (
@@ -283,6 +508,28 @@ function OrderCard({ order, t, destName, typeName, statusName, varieties, curren
         </div>
       )}
 
+      {/* 订单创建人与最后修改人及操作时间 */}
+      <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-y-1.5 gap-x-2 text-[11px]">
+        <div className="flex items-center gap-1 text-slate-500 min-w-0">
+          <span className="text-[10px] text-slate-400 font-semibold">{t('order.creator') || '创建人'}:</span>
+          <span className="inline-flex items-center gap-1 font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md text-[10px]">
+            <User size={11} className="text-slate-400 shrink-0" />
+            <span className="truncate max-w-[90px]">{order.ocreator || 'admin'}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-slate-500 min-w-0">
+          <span className="text-[10px] text-slate-400 font-semibold">{t('order.last_modifier') || '最后修改'}:</span>
+          <span className="inline-flex items-center gap-1 font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md text-[10px]">
+            <UserCheck size={11} className="text-slate-400 shrink-0" />
+            <span className="truncate max-w-[90px]">{order.omodifier || order.ocreator || 'admin'}</span>
+          </span>
+          <span className="inline-flex items-center gap-0.5 text-slate-400 text-[10px] font-medium shrink-0">
+            <Clock size={10} className="text-slate-400 shrink-0" />
+            <span>{order.omodtime ? (order.omodtime.includes(':') ? order.omodtime : formatDate(order.omodtime)) : (order.ocdate ? formatDate(order.ocdate) : '-')}</span>
+          </span>
+        </div>
+      </div>
+
       {order.status < OrderStatus.FULL_PAID && order.status !== OrderStatus.DELETED && (
         <button 
           onClick={(e) => { e.stopPropagation(); onClick(); }}
@@ -384,7 +631,7 @@ function OrderDetailsModal({ order, onClose, onUpdate }: { order: Order, onClose
           oconfn: fileName,
           ocdate: newOcDate,
           ...(fileDataUrl && !isMysql ? { ocontract_data: fileDataUrl } : {})
-        });
+        }, `上传合同并签约: 合同编号 "${conId}", 文件 "${fileName}", 状态更新为已签约`);
       } else if (order.status === OrderStatus.SIGNED) {
         if (!receivedAmount || isNaN(Number(receivedAmount)) || Number(receivedAmount) < 0) { 
           alert('Please enter a valid amount'); 
@@ -408,7 +655,12 @@ function OrderDetailsModal({ order, onClose, onUpdate }: { order: Order, onClose
           updates.oarp = receivedAmount;
         }
 
-        await dataService.updateOrder(order.oid!, updates);
+        const curSymbol = getCurrencyShortSymbol(receivedCurrency);
+        const actionMsg = isDeposit
+          ? `收取定金 ${receivedAmount} ${curSymbol}, 状态更新为已付定金`
+          : `收取全款 ${receivedAmount} ${curSymbol}, 状态更新为已付全款`;
+
+        await dataService.updateOrder(order.oid!, updates, actionMsg);
       } else if (order.status === OrderStatus.DEPOSIT_PAID) {
         if (!receivedAmount || isNaN(Number(receivedAmount)) || Number(receivedAmount) < 0) { 
           alert('Please enter a valid amount'); 
@@ -422,6 +674,7 @@ function OrderDetailsModal({ order, onClose, onUpdate }: { order: Order, onClose
         const deposit = Number(order.oard || 0);
         const balance = Number(receivedAmount);
         const total = (deposit + balance).toString();
+        const curSymbol = getCurrencyShortSymbol(receivedCurrency);
 
         await dataService.updateOrder(order.oid!, { 
           status: newStatus, 
@@ -429,7 +682,7 @@ function OrderDetailsModal({ order, onClose, onUpdate }: { order: Order, onClose
           oarp: total,
           oarpc: Number(receivedCurrency),
           ocdate: newOcDate
-        });
+        }, `收取尾款 ${receivedAmount} ${curSymbol}, 累计实收 ${total} ${curSymbol}, 状态更新为已付全款`);
       }
       onUpdate();
       onClose();
@@ -604,6 +857,7 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
   const [showContractModal, setShowContractModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showRefundConfirm, setShowRefundConfirm] = useState(false);
+  const [showOpRecordsModal, setShowOpRecordsModal] = useState(false);
   const [refundAmt, setRefundAmt] = useState('');
   const [refundCur, setRefundCur] = useState(1);
   const orders = useOrders();
@@ -670,6 +924,13 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
         <div className="grid gap-2">
           <OptionButton icon={<Edit2 size={18} />} label={order.status >= OrderStatus.DEPOSIT_PAID ? t('action.edit_info') : t('action.edit_base_info')} onClick={onEdit} />
           
+          {/* 订单操作记录入口 */}
+          <OptionButton 
+            icon={<History size={18} className="text-blue-500" />} 
+            label={t('order.op_records') || '订单操作记录 / Operation Logs'} 
+            onClick={() => setShowOpRecordsModal(true)} 
+          />
+
           {(order.status >= OrderStatus.SIGNED || order.status === OrderStatus.INTENTIONAL) && order.status !== OrderStatus.REFUNDED && (
              <OptionButton icon={<FileText size={18} />} label={t('action.update_contract')} onClick={() => setShowContractModal(true)} />
           )}
@@ -785,7 +1046,11 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
                       orf: refundAmt,
                       orfc: refundCur
                     };
-                    await dataService.updateOrder(order.oid!, orderData);
+                    await dataService.updateOrder(
+                      order.oid!, 
+                      orderData, 
+                      `申请退款: 金额 ${refundAmt} ${getCurrencyShortSymbol(refundCur)}, 状态变更为已退款`
+                    );
                     setShowRefundConfirm(false);
                     setShowRefundModal(false);
                     onClose();
@@ -801,7 +1066,137 @@ function OrderOptionsModal({ oid, onClose, onEdit }: { oid: number, onClose: () 
           </div>
         </Modal>
       )}
+
+      {showOpRecordsModal && (
+        <OrderOpRecordsModal 
+          oid={oid} 
+          order={order} 
+          onClose={() => setShowOpRecordsModal(false)} 
+        />
+      )}
     </>
+  );
+}
+
+function OrderOpRecordsModal({ oid, order, onClose }: { oid: number, order: Order, onClose: () => void }) {
+  const { t } = useI18n();
+  const [records, setRecords] = useState<OpRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    dataService.getOrderOpRecords(oid)
+      .then(res => {
+        if (isMounted) {
+          setRecords(res);
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load order op records', err);
+        if (isMounted) setLoading(false);
+      });
+    return () => { isMounted = false; };
+  }, [oid]);
+
+  return (
+    <Modal title={t('order.op_records_title') || '订单操作记录明细'} onClose={onClose}>
+      <div className="space-y-4">
+        {/* Order Header Summary */}
+        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-slate-800 flex items-center gap-1.5 truncate">
+              <span className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded-lg text-[10px] shrink-0">#{oid}</span>
+              <span className="truncate">{order.ocname || '-'}</span>
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 shrink-0">
+              {records.length} {t('order.op_records') || '条记录'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 text-[11px]">
+            <div>
+              <span className="text-[10px] text-slate-400 block font-semibold">{t('order.creator') || '创建人'}:</span>
+              <span className="font-bold text-slate-700 flex items-center gap-1 mt-0.5 truncate">
+                <User size={12} className="text-emerald-500 shrink-0" />
+                <span className="truncate">{order.ocreator || 'admin'}</span>
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-semibold">{t('order.last_modifier') || '最后修改'}:</span>
+              <span className="font-bold text-slate-700 flex items-center gap-1 mt-0.5 truncate">
+                <UserCheck size={12} className="text-blue-500 shrink-0" />
+                <span className="truncate">{order.omodifier || order.ocreator || 'admin'}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Operation Records Timeline */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <History size={14} className="text-slate-400" />
+              {t('order.op_records') || '操作历史明细'}
+            </span>
+            <span className="text-[10px] text-slate-400">
+              按时间正序排列
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="py-8 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
+              <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <span>正在加载操作记录...</span>
+            </div>
+          ) : records.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+              {t('order.no_op_records') || '暂无操作记录'}
+            </div>
+          ) : (
+            <div className="relative pl-5 space-y-3 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 max-h-[42vh] overflow-y-auto no-scrollbar pr-1">
+              {records.map((rec, idx) => {
+                const cleanDesc = rec.desc.replace(/^\[订单\s*#\d+\]\s*/, '');
+                return (
+                  <div key={rec.orid || idx} className="relative group">
+                    {/* Timeline Node Dot */}
+                    <div className="absolute -left-[17px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-emerald-500 shadow-xs" />
+
+                    <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-1.5 hover:border-slate-200 transition-colors">
+                      {/* Operator & Time */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1 font-bold text-xs text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100 truncate">
+                          <User size={12} className="text-slate-400 shrink-0" />
+                          <span className="truncate">{rec.spellname || 'admin'}</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 flex items-center gap-1 shrink-0 font-medium">
+                          <Clock size={11} className="text-slate-400" />
+                          {rec.optime}
+                        </span>
+                      </div>
+
+                      {/* Operation Content */}
+                      <p className="text-xs text-slate-700 font-medium leading-relaxed bg-slate-50/60 p-2 rounded-xl break-words">
+                        {cleanDesc}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Close Button */}
+        <button 
+          onClick={onClose} 
+          className="w-full py-3 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-slate-800 transition-colors"
+        >
+          {t('action.close') || '关闭'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
